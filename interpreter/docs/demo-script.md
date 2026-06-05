@@ -14,11 +14,19 @@ npm install
 npm run dev
 ```
 
-2. 打开 `http://localhost:5173`。
-3. 保持输入源为 `Demo`，不需要 API Key 也能完成稳定演示。
-4. 在左侧 Demo 场景中选择一个最适合讲解的预设，例如 `Product Launch`、`Technical Talk` 或 `Business Meeting`。
-5. 可选：如果要展示真实流式翻译，在 `Configuration -> Translate` 填写 OpenAI-compatible API Key。
-6. 可选：如果要展示真实文件或直播 ASR，在 `Configuration -> ASR` 填写 OpenAI ASR Key。
+2. 如需展示真实 OpenAI ASR / 翻译代理，另开终端：
+
+```bash
+copy .env.example .env
+# 在 .env 中填写 OPENAI_API_KEY
+npm run dev:server
+```
+
+3. 打开 `http://localhost:5173`。
+4. 保持输入源为 `Demo`，不需要 API Key 也能完成稳定演示。
+5. 在左侧 Demo 场景中选择一个最适合讲解的预设，例如 `Product Launch`、`Technical Talk` 或 `Business Meeting`。
+6. 可选：如果要展示真实流式翻译，可以在浏览器内填写 OpenAI-compatible API Key，也可以启动本地后端代理并选择 `OpenAI` Provider。
+7. 可选：如果要展示真实文件或直播 ASR，可以在浏览器内填写 OpenAI ASR Key，也可以使用配置了 `OPENAI_API_KEY` 的本地后端代理。
 
 ## 讲解顺序
 
@@ -75,21 +83,21 @@ npm run dev
 
 ### 6. 展示文件模式
 
-“文件模式支持上传本地英文音频或视频。填写 ASR Key 后，系统会调用 `/audio/transcriptions` 做真实英文转写，再进入中文翻译、修正、术语和导出流程。”
+“文件模式支持上传本地英文音频或视频。填写浏览器 ASR Key，或者启动配置了 OPENAI_API_KEY 的本地后端代理后，系统会调用 `/audio/transcriptions` 做真实英文转写，再进入中文翻译、修正、术语和导出流程。”
 
 画面操作：
 
 1. 切换到 `File`。
 2. 上传一个音频或视频文件。
-3. 在 `Configuration -> ASR` 确认 ASR Key 和模型。
+3. 在 `Configuration -> ASR` 确认浏览器 Key 或 server key 状态和模型。
 4. 点击 `Transcribe Uploaded File`。
 5. 展示文件名、ASR 状态、进度条、波形和字幕输出。
 
-边界说明：“浏览器直传限制为 25MB；未填写 ASR Key 时会明确降级为演示转写流。”
+边界说明：“当前前端上传仍限制为 25MB；浏览器和后端都未配置 Key 时会明确降级为演示转写流。”
 
 ### 7. 展示直播捕获和分片 ASR
 
-“Live 模式可以捕获浏览器标签页或屏幕音频。填写 ASR Key 后，系统会使用 MediaRecorder 按分片长度持续转写直播音频，再送入中文翻译链路。”
+“Live 模式可以捕获浏览器标签页或屏幕音频。填写浏览器 ASR Key，或者启动配置了 OPENAI_API_KEY 的本地后端代理后，系统会使用 MediaRecorder 按分片长度持续转写直播音频，再送入中文翻译链路。”
 
 画面操作：
 

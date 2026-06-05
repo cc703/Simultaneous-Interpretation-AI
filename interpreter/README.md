@@ -10,7 +10,7 @@
 
 PR-14：演示材料与提交文案完善。
 
-当前已建立 Vite + React 前端工程，完成同传字幕工作台的静态界面，接入 Web Speech API STT 封装，实现 OpenAI-compatible 流式翻译引擎，完成可演示的翻译修正闭环，加入稳定 Demo 模式，支持文件上传后调用 OpenAI `/audio/transcriptions` 做真实英文转写，支持直播标签页/屏幕音频捕获并通过 MediaRecorder 分片送入 ASR，支持高级设置面板，接入 Web Audio 波形可视化，支持浏览器中文 TTS 播报，并支持导出 SRT / 复制双语文本 / 同传复盘报告。页面包含输入源选择、Provider 配置、File/Live ASR 配置、术语表、质量诊断、修正记忆、字幕设置、时间轴字幕流、修正编辑器、底部大字幕和统计栏。
+当前已建立 Vite + React 前端工程和 Node 后端代理，完成同传字幕工作台、Web Speech API STT、OpenAI-compatible 流式翻译、OpenAI `/audio/transcriptions` ASR 代理、翻译修正闭环、稳定 Demo 模式、文件上传真实转写、直播标签页/屏幕音频捕获与 MediaRecorder 分片 ASR、高级设置、Web Audio 波形、浏览器中文 TTS、SRT / 双语文本 / 同传复盘报告导出。页面包含输入源选择、Provider 配置、File/Live ASR 配置、术语表、质量诊断、修正记忆、字幕设置、时间轴字幕流、修正编辑器、底部大字幕和统计栏。
 
 Demo 视频：待录制，提交前替换为公开可访问链接。
 
@@ -28,6 +28,17 @@ npm run dev
 
 开发服务器默认运行在 `http://localhost:5173`。
 
+真实 ASR / OpenAI 翻译推荐同时启动本地后端代理：
+
+```bash
+cd interpreter
+copy .env.example .env
+# 在 .env 中填写 OPENAI_API_KEY
+npm run dev:server
+```
+
+然后另开一个终端运行 `npm run dev`。Vite 会把 `/api/*` 转发到 `http://localhost:8787`。未启动后端时，Demo 模式仍可完整演示；填写浏览器内存 Key 时也可以继续走浏览器直连。
+
 验证命令：
 
 ```bash
@@ -43,7 +54,7 @@ Chrome 或 Edge 中打开本地页面，点击输入源 `Mic`，再点击 `Start
 
 ## 翻译验证
 
-当前翻译引擎支持 OpenAI-compatible SSE 流式响应，默认 Provider 为 DeepSeek。左侧 `Configuration -> Translate` 可选择 DeepSeek、OpenAI 或 Custom，并填写 API Key。API Key 只保存在当前页面内存状态中，不写入 localStorage。未填写 Key 时会明确显示“等待填写 API Key 后接入实时中文翻译”。
+当前翻译引擎支持 OpenAI-compatible SSE 流式响应。左侧 `Configuration -> Translate` 可选择 DeepSeek、OpenAI 或 Custom，并填写 API Key；API Key 只保存在当前页面内存状态中，不写入 localStorage。若启动了本地后端并在 `.env` 配置 `OPENAI_API_KEY`，选择 `OpenAI` Provider 且浏览器 Key 为空时，前端会优先通过 `/api/translate` 使用服务端代理。
 
 ## 修正闭环验证
 
@@ -70,21 +81,21 @@ Chrome 或 Edge 中打开本地页面，点击输入源 `Mic`，再点击 `Start
 ## 文件模式验证
 
 1. 点击输入源 `File`，上传 `.mp3`、`.mp4`、`.wav`、`.m4a`、`.webm` 或 `.ogg` 文件。
-2. 在 `Configuration -> ASR` 填写 OpenAI ASR Key，默认模型为 `gpt-4o-mini-transcribe`。
+2. 在 `Configuration -> ASR` 填写 OpenAI ASR Key，或启动已配置 `OPENAI_API_KEY` 的本地后端代理；默认模型为 `gpt-4o-mini-transcribe`。
 3. 左侧会显示文件名、大小、格式和时长。
 4. 点击 `Start Interpreting` 后，系统会把文件发送到 `/audio/transcriptions` 做真实英文转写。
 5. 转写结果会按英文句子进入现有中文翻译、字幕修正、术语命中、TTS 和导出流程。
-6. 如果未填写 ASR Key，文件模式会明确提示并降级为内置演示转写流，不会伪装成真实 ASR。
-7. 浏览器直传限制为 25MB；更大文件需要后端分片上传。
+6. 如果未填写浏览器 ASR Key 且后端没有配置 Key，文件模式会明确提示并降级为内置演示转写流，不会伪装成真实 ASR。
+7. 当前前端仍限制单次上传 25MB；更大文件可继续扩展后端分片上传。
 
 ## 直播模式验证
 
 1. 点击输入源 `Live`。
-2. 在 `Configuration -> ASR` 填写 OpenAI ASR Key，Live 会复用同一套 `/audio/transcriptions` 配置。
+2. 在 `Configuration -> ASR` 填写 OpenAI ASR Key，或启动已配置 `OPENAI_API_KEY` 的本地后端代理；Live 会复用同一套 `/audio/transcriptions` 配置。
 3. 点击 `Choose tab audio`，选择一个带英文音频的浏览器标签页或屏幕。
 4. 左侧会显示捕获来源名称，并可点击 `Stop live capture` 释放所有音频 track。
 5. 如果浏览器支持 MediaRecorder，系统会按设置的音频分片长度持续转写直播音频，并把转写文本送入翻译链路。
-6. 未填写 ASR Key 时，Live 只展示捕获和波形，不会伪装为真实转写。
+6. 未填写浏览器 ASR Key 且后端没有配置 Key 时，Live 只展示捕获和波形，不会伪装为真实转写。
 
 ## 设置面板验证
 
@@ -122,9 +133,9 @@ Chrome 或 Edge 中打开本地页面，点击输入源 `Mic`，再点击 `Start
 ## 计划功能
 
 - 麦克风英文语音实时识别与中文字幕输出：已完成浏览器 Web Speech API MVP。
-- 文件音频真实 ASR：已完成 OpenAI `/audio/transcriptions` 浏览器直传入口，未填 ASR Key 时降级为稳定演示流。
+- 文件音频真实 ASR：已完成 OpenAI `/audio/transcriptions` 浏览器直传入口与 Node 后端代理入口，未配置 Key 时降级为稳定演示流。
 - Demo 音频流：已完成英文语音模拟 + 中文流式字幕，用于无 Key 稳定演示。
-- AI 流式翻译：已完成 OpenAI-compatible SSE 引擎与 Provider 配置。
+- AI 流式翻译：已完成 OpenAI-compatible SSE 引擎、Provider 配置与 `/api/translate` 服务端代理。
 - 人工修正字幕译文：已完成。
 - 术语表与术语命中：已完成。
 - 质量诊断与修正记忆：已完成，支持风险标签、Risk Review 和用户修正记忆 prompt。

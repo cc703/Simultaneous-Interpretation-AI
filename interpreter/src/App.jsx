@@ -40,6 +40,7 @@ import {
 import { useStore } from './store/index.js';
 import { copyBilingual, exportReviewReport, exportSRT } from './utils/export.js';
 import { buildCorrectionMemory, summarizeQuality } from './utils/quality.js';
+import { getServerHealth } from './engine/serverApi.js';
 
 export default function App() {
   const isRunning = useStore((state) => state.isRunning);
@@ -109,6 +110,7 @@ export default function App() {
   const [fileProgress, setFileProgress] = useState(0);
   const [fileStatus, setFileStatus] = useState('');
   const [liveStatus, setLiveStatus] = useState('');
+  const [serverHealth, setServerHealth] = useState({ ok: false, hasOpenAIKey: false });
   const [settingsOpen, setSettingsOpen] = useState(false);
   const [configTab, setConfigTab] = useState('translate');
   const audioRef = useRef(null);
@@ -119,7 +121,9 @@ export default function App() {
     sourceMode,
     fileMeta,
     asrApiKey,
+    serverHasApiKey: serverHealth.hasOpenAIKey,
     apiKey,
+    provider,
     hasSubtitles,
     correctionCount,
   });
@@ -128,6 +132,8 @@ export default function App() {
     fileMeta,
     asrApiKey,
     apiKey,
+    serverHasApiKey: serverHealth.hasOpenAIKey,
+    provider,
     hasSubtitles,
     correctionCount,
     isRunning,
@@ -172,6 +178,10 @@ export default function App() {
 
   useEffect(() => {
     initTTS();
+  }, []);
+
+  useEffect(() => {
+    getServerHealth({ refresh: true }).then(setServerHealth);
   }, []);
 
   useEffect(() => {
@@ -235,8 +245,9 @@ export default function App() {
       return;
     }
 
-    if (!asrApiKey.trim()) {
-      setFileStatus('未填写 ASR Key，已降级为演示转写流。');
+    const hasServerAsr = serverHealth.ok && serverHealth.hasOpenAIKey;
+    if (!asrApiKey.trim() && !hasServerAsr) {
+      setFileStatus('未填写浏览器 ASR Key，后端也未配置 OPENAI_API_KEY，已降级为演示转写流。');
       startFileDemoStream(audioRef.current);
       return;
     }
@@ -244,7 +255,9 @@ export default function App() {
     const audio = audioRef.current;
     audio?.play().catch((error) => console.warn('[file] preview playback failed:', error));
     useStore.getState().startTranslation();
-    setFileStatus('正在调用真实 ASR 转写文件音频...');
+    setFileStatus(hasServerAsr && !asrApiKey.trim()
+      ? '正在通过本地后端代理调用真实 ASR...'
+      : '正在调用真实 ASR 转写文件音频...');
     useStore.getState().updateCurrentInterim({
       en: file.name,
       zh: '正在上传音频并进行英文转写...',
@@ -375,8 +388,8 @@ export default function App() {
   };
 
   const startLiveAsrIfReady = (audioStream) => {
-    if (!asrApiKey.trim()) {
-      setLiveStatus('已捕获直播音频。填写 File ASR Key 后可启动真实直播转写。');
+    if (!asrApiKey.trim() && !serverHealth.hasOpenAIKey) {
+      setLiveStatus('已捕获直播音频。填写浏览器 ASR Key 或启动配置 OPENAI_API_KEY 的本地后端后可转写。');
       return;
     }
 
@@ -489,9 +502,9 @@ export default function App() {
               </strong>
               <span>
                 {sourceMode === 'file'
-                  ? (asrApiKey ? 'Real file ASR enabled · audio transcriptions API' : 'Add ASR key for real file transcription')
+                  ? (asrApiKey || serverHealth.hasOpenAIKey ? 'Real file ASR enabled · audio transcriptions API' : 'Add ASR key or start local server for real transcription')
                   : sourceMode === 'live'
-                    ? (asrApiKey ? 'Live ASR chunks enabled · MediaRecorder' : 'Capture audio first · add ASR key for real transcription')
+                    ? (asrApiKey || serverHealth.hasOpenAIKey ? 'Live ASR chunks enabled · MediaRecorder' : 'Capture audio first · add ASR key or server key')
                   : sourceMode === 'demo'
                   ? 'Built-in English voice + streaming Chinese captions'
                   : (isSTTSupported()
@@ -611,7 +624,7 @@ export default function App() {
               <div className="config-body">
                 <div className="field-line compact">
                   <span>{provider}</span>
-                  <code>{apiKey ? 'key ready' : 'key needed'}</code>
+                  <code>{apiKey ? 'browser key' : provider === 'openai' && serverHealth.hasOpenAIKey ? 'server key' : 'key needed'}</code>
                 </div>
                 <select
                   className="settings-control"
@@ -640,7 +653,9 @@ export default function App() {
                   value={apiKey}
                   onChange={(event) => setApiKey(event.target.value)}
                 />
-                <div className="secret-input">Translation key is memory only</div>
+                <div className="secret-input">
+                  Browser key stays in memory. OpenAI can also use the local server proxy.
+                </div>
               </div>
             )}
 
@@ -648,7 +663,7 @@ export default function App() {
               <div className="config-body">
                 <div className="field-line compact">
                   <span>{asrModel}</span>
-                  <code>{asrApiKey ? 'key ready' : 'key needed'}</code>
+                  <code>{asrApiKey ? 'browser key' : serverHealth.hasOpenAIKey ? 'server key' : 'key needed'}</code>
                 </div>
                 <select
                   className="settings-control"
@@ -775,7 +790,7 @@ export default function App() {
               </button>
             </div>
             <div className="toolbar-note">
-              Latency {latencyMs ? `${(latencyMs / 1000).toFixed(1)}s` : '1.8s'} · Context window {contextWindow}
+              Latency {latencyMs ? `${(latencyMs / 1000).toFixed(1)}s` : '1.8s'} · Context {contextWindow} · API {serverHealth.hasOpenAIKey ? 'server' : 'browser'}
             </div>
           </div>
 
@@ -786,7 +801,7 @@ export default function App() {
             </div>
             <div>
               <span>Real Input</span>
-              <strong>{sourceMode === 'file' && asrApiKey ? 'File ASR' : sourceMode === 'mic' ? 'Mic STT' : sourceMode === 'live' ? 'Live capture' : 'Demo'}</strong>
+              <strong>{sourceMode === 'file' && (asrApiKey || serverHealth.hasOpenAIKey) ? 'File ASR' : sourceMode === 'mic' ? 'Mic STT' : sourceMode === 'live' ? 'Live capture' : 'Demo'}</strong>
             </div>
             <div>
               <span>Glossary Hits</span>
@@ -1082,19 +1097,19 @@ function SubtitleCard({ subtitle, analysis, isSelected, onSelect, showOriginal, 
   );
 }
 
-function buildWorkflowSteps({ sourceMode, fileMeta, asrApiKey, apiKey, hasSubtitles, correctionCount }) {
+function buildWorkflowSteps({ sourceMode, fileMeta, asrApiKey, serverHasApiKey, apiKey, provider, hasSubtitles, correctionCount }) {
   const inputReady = sourceMode === 'demo'
     || sourceMode === 'mic'
     || sourceMode === 'live'
     || Boolean(fileMeta);
   const recognitionReady = sourceMode === 'file' || sourceMode === 'live'
-    ? Boolean(asrApiKey)
+    ? Boolean(asrApiKey || serverHasApiKey)
     : true;
 
   return [
     { label: 'Input', icon: sourceMode === 'file' ? FileAudio : sourceMode === 'mic' ? Mic : sourceMode === 'live' ? Radio : Sparkles, done: inputReady },
     { label: 'ASR', icon: Captions, done: recognitionReady },
-    { label: 'Translate', icon: Wand2, done: Boolean(apiKey) || sourceMode === 'demo' || hasSubtitles },
+    { label: 'Translate', icon: Wand2, done: Boolean(apiKey) || (provider === 'openai' && serverHasApiKey) || sourceMode === 'demo' || hasSubtitles },
     { label: 'Correct', icon: BadgeCheck, done: correctionCount > 0 },
     { label: 'Export', icon: ClipboardCheck, done: hasSubtitles },
   ];
@@ -1105,14 +1120,16 @@ function getNextAction({
   fileMeta,
   asrApiKey,
   apiKey,
+  serverHasApiKey,
+  provider,
   hasSubtitles,
   correctionCount,
   isRunning,
 }) {
   if (isRunning) return '正在同传处理中，等待下一条稳定字幕后可修正或导出。';
   if (sourceMode === 'file' && !fileMeta) return '先上传一段英文音频或视频，再开始真实文件转写。';
-  if (sourceMode === 'file' && !asrApiKey) return '填写 File ASR Key 后，文件模式会走真实音频转写。';
-  if (!apiKey && sourceMode !== 'demo') return '填写翻译 Provider Key 后，ASR 结果会继续生成中文字幕。';
+  if (sourceMode === 'file' && !asrApiKey && !serverHasApiKey) return '填写 File ASR Key，或启动带 OPENAI_API_KEY 的后端后，文件模式会走真实音频转写。';
+  if (!apiKey && !(provider === 'openai' && serverHasApiKey) && sourceMode !== 'demo') return '填写翻译 Provider Key，或启动带 OPENAI_API_KEY 的后端并选择 OpenAI Provider。';
   if (!hasSubtitles) return '点击 Start Interpreting，开始生成第一批双语字幕。';
   if (correctionCount === 0) return '点击一条字幕，在 Correction Desk 里保存一次人工修正。';
   return '当前闭环已跑通，可以导出 SRT 或继续添加术语重译。';

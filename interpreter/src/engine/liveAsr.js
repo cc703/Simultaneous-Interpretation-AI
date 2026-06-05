@@ -21,7 +21,6 @@ export function startLiveASR(stream, {
 
   if (!stream) throw new Error('缺少直播音频流。');
   if (!isLiveASRSupported()) throw new Error('当前浏览器不支持 MediaRecorder 直播切片。');
-  if (!apiKey?.trim()) throw new Error('请先填写 File ASR / Live ASR Key。');
 
   const mimeType = pickMimeType();
   recorder = new MediaRecorder(stream, mimeType ? { mimeType } : undefined);

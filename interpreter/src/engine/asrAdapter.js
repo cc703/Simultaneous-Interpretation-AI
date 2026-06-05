@@ -36,10 +36,10 @@ export async function transcribeAudioBlob({
   language = 'en',
 }) {
   if (!blob) throw new Error('缺少可转写的音频片段。');
-  if (!apiKey) throw new Error('请先填写 OpenAI ASR API Key。');
   if (blob.size > MAX_BROWSER_UPLOAD_BYTES) {
     throw new Error('当前浏览器直传限制为 25MB，请换更短的音频或接入后端分片。');
   }
+  const useServerProxy = !apiKey;
 
   const form = new FormData();
   form.append('file', blob, filename);
@@ -47,9 +47,9 @@ export async function transcribeAudioBlob({
   form.append('language', language);
   form.append('response_format', 'json');
 
-  const response = await fetch(`${baseUrl.replace(/\/$/, '')}/audio/transcriptions`, {
+  const response = await fetch(useServerProxy ? '/api/transcribe' : `${baseUrl.replace(/\/$/, '')}/audio/transcriptions`, {
     method: 'POST',
-    headers: {
+    headers: useServerProxy ? undefined : {
       Authorization: `Bearer ${apiKey}`,
     },
     body: form,

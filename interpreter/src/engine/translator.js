@@ -61,17 +61,18 @@ export async function* streamTranslate({
   onToken,
 }) {
   const config = resolveProviderConfig({ provider, baseUrl, model });
+  const useServerProxy = !apiKey && provider === 'openai';
   if (!apiKey) {
-    throw new Error('Missing API key for translation provider.');
+    if (!useServerProxy) throw new Error('Missing API key for translation provider.');
   }
   if (config.protocol !== 'openai') {
     throw new Error('This browser client currently supports OpenAI-compatible streaming only.');
   }
 
-  const response = await fetch(`${config.baseUrl.replace(/\/$/, '')}/chat/completions`, {
+  const response = await fetch(useServerProxy ? '/api/translate' : `${config.baseUrl.replace(/\/$/, '')}/chat/completions`, {
     method: 'POST',
     headers: {
-      Authorization: `Bearer ${apiKey}`,
+      ...(useServerProxy ? {} : { Authorization: `Bearer ${apiKey}` }),
       'Content-Type': 'application/json',
     },
     body: JSON.stringify({
