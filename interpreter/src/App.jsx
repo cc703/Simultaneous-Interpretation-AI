@@ -12,6 +12,10 @@ import {
   stopDemoStream,
   stopSTTSession,
   stopSystemAudioCapture,
+  initTTS,
+  cancelTTS,
+  setTTSEnabled,
+  setTTSRate,
 } from './engine/index.js';
 import { useStore } from './store/index.js';
 import { copyBilingual, exportSRT } from './utils/export.js';
@@ -30,6 +34,9 @@ export default function App() {
   const contextWindow = useStore((state) => state.contextWindow);
   const chunkSeconds = useStore((state) => state.chunkSeconds);
   const terminologyBoost = useStore((state) => state.terminologyBoost);
+  const voiceOutput = useStore((state) => state.voiceOutput);
+  const ttsRate = useStore((state) => state.ttsRate);
+  const ttsQuality = useStore((state) => state.ttsQuality);
   const captureStream = useStore((state) => state.captureStream);
   const captureSourceLabel = useStore((state) => state.captureSourceLabel);
   const isCapturing = useStore((state) => state.isCapturing);
@@ -46,6 +53,9 @@ export default function App() {
   const setContextWindow = useStore((state) => state.setContextWindow);
   const setChunkSeconds = useStore((state) => state.setChunkSeconds);
   const setTerminologyBoost = useStore((state) => state.setTerminologyBoost);
+  const setVoiceOutput = useStore((state) => state.setVoiceOutput);
+  const setStoreTtsRate = useStore((state) => state.setTtsRate);
+  const setTtsQuality = useStore((state) => state.setTtsQuality);
   const setUploadedFile = useStore((state) => state.setUploadedFile);
   const setCaptureStream = useStore((state) => state.setCaptureStream);
   const addGlossaryTerm = useStore((state) => state.addGlossaryTerm);
@@ -74,6 +84,18 @@ export default function App() {
   }, [addGlossaryTerm, glossary.length]);
 
   useEffect(() => {
+    initTTS();
+  }, []);
+
+  useEffect(() => {
+    setTTSEnabled(voiceOutput);
+  }, [voiceOutput]);
+
+  useEffect(() => {
+    setTTSRate(ttsRate);
+  }, [ttsRate]);
+
+  useEffect(() => {
     setDraftZh(selectedSubtitle?.zh ?? '');
   }, [selectedSubtitle?.id, selectedSubtitle?.zh]);
 
@@ -86,9 +108,11 @@ export default function App() {
       if (sourceMode === 'demo' || sourceMode === 'file') {
         stopDemoStream();
         stopAudioAnalyser();
+        cancelTTS();
         useStore.getState().stopTranslation();
       } else {
         stopAudioAnalyser();
+        cancelTTS();
         stopSTTSession();
       }
       return;
@@ -380,7 +404,11 @@ export default function App() {
               <span>Auto correction</span>
             </label>
             <label className="toggle-line">
-              <input type="checkbox" />
+              <input
+                checked={voiceOutput}
+                type="checkbox"
+                onChange={(event) => setVoiceOutput(event.target.checked)}
+              />
               <span>Chinese voice output</span>
             </label>
           </section>
@@ -544,6 +572,24 @@ export default function App() {
                 onChange={(event) => setTerminologyBoost(event.target.checked)}
               />
               <span>专业词汇增强</span>
+            </label>
+            <label>
+              <span>语音播报速度：{ttsRate.toFixed(1)}x</span>
+              <input
+                max="1.5"
+                min="0.8"
+                step="0.1"
+                type="range"
+                value={ttsRate}
+                onChange={(event) => setStoreTtsRate(event.target.value)}
+              />
+            </label>
+            <label>
+              <span>语音音质</span>
+              <select value={ttsQuality} onChange={(event) => setTtsQuality(event.target.value)}>
+                <option value="browser">浏览器原生</option>
+                <option value="openai">OpenAI TTS（预留）</option>
+              </select>
             </label>
           </section>
         </div>

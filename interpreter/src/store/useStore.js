@@ -84,6 +84,8 @@ export const useStore = create((set, get) => ({
   showOriginal: true,
   autoCorrect: true,
   voiceOutput: false,
+  ttsRate: savedSettings.ttsRate ?? 1.1,
+  ttsQuality: savedSettings.ttsQuality ?? 'browser',
 
   // 统计
   totalSentences: 0,
@@ -141,6 +143,8 @@ export const useStore = create((set, get) => ({
       contextWindow: state.contextWindow,
       chunkSeconds: state.chunkSeconds,
       terminologyBoost: state.terminologyBoost,
+      ttsRate: state.ttsRate,
+      ttsQuality: state.ttsQuality,
     });
   },
 
@@ -294,6 +298,14 @@ export const useStore = create((set, get) => ({
   setShowOriginal: (showOriginal) => set({ showOriginal }),
   setAutoCorrect: (autoCorrect) => set({ autoCorrect }),
   setVoiceOutput: (voiceOutput) => set({ voiceOutput }),
+  setTtsRate: (ttsRate) => {
+    set({ ttsRate: Number(ttsRate) });
+    get().persistUserSettings();
+  },
+  setTtsQuality: (ttsQuality) => {
+    set({ ttsQuality });
+    get().persistUserSettings();
+  },
 
   resetSession: () => set({
     uploadedFile: null,

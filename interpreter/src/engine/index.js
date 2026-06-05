@@ -26,3 +26,10 @@ export {
   startStreamAnalyser,
   stopAudioAnalyser,
 } from './audioAnalyser.js';
+export {
+  cancelTTS,
+  enqueueTTS,
+  initTTS,
+  setTTSEnabled,
+  setTTSRate,
+} from './tts.js';

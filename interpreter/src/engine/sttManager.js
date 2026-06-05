@@ -1,6 +1,7 @@
 import { useStore } from '../store/index.js';
 import { STTEngine } from './stt.js';
 import { buildContext, buildGlossaryPrompt, streamTranslate } from './translator.js';
+import { cancelTTS, enqueueTTS } from './tts.js';
 
 let sttEngine = null;
 
@@ -26,6 +27,7 @@ export function startSTTSession() {
 
 export function stopSTTSession() {
   getSTTEngine().stop();
+  cancelTTS();
   useStore.getState().stopTranslation();
 }
 
@@ -76,6 +78,7 @@ function wireEngineToStore(engine) {
         correctionType: null,
         termsApplied: [],
       });
+      if (useStore.getState().voiceOutput) enqueueTTS(translatedText);
       useStore.setState({ latencyMs: Math.round(performance.now() - startedAt) });
     })
     .onError((error) => {

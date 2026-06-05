@@ -1,5 +1,6 @@
 import { useStore } from '../store/index.js';
 import { demoTranscript } from '../mock/demoTranscript.js';
+import { enqueueTTS } from './tts.js';
 
 let timers = [];
 let fileStopper = null;
@@ -22,6 +23,7 @@ export function startDemoStream({ speed = 0.45 } = {}) {
         correctionType: entry.termsApplied?.length ? 'glossary' : null,
         termsApplied: entry.termsApplied ?? [],
       });
+      if (useStore.getState().voiceOutput) enqueueTTS(entry.zh);
 
       if (index === demoTranscript.length - 1) {
         useStore.getState().stopTranslation();
@@ -71,6 +73,7 @@ export function startFileDemoStream(audioElement) {
         correctionType: entry.termsApplied?.length ? 'glossary' : null,
         termsApplied: entry.termsApplied ?? [],
       });
+      if (useStore.getState().voiceOutput) enqueueTTS(entry.zh);
     });
   };
 
