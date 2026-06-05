@@ -235,7 +235,9 @@ export default function App() {
         </div>
         <div className="status-pill">
           <span />
-          {isRunning ? `${sourceMode} stream active` : 'Demo stream ready'}
+          {isRunning
+            ? `${sourceMode} audio -> Chinese live`
+            : 'Demo audio stream ready'}
         </div>
         <div className="top-actions" aria-label="Header actions">
           <button type="button" onClick={() => setSettingsOpen(true)}>Settings</button>
@@ -292,7 +294,7 @@ export default function App() {
                   : sourceMode === 'live'
                     ? 'Captured system audio is ready for ASR adapter expansion'
                   : sourceMode === 'demo'
-                  ? 'Stable review demo · captions stream by timeline'
+                  ? 'Built-in English voice + streaming Chinese captions'
                   : (isSTTSupported()
                     ? 'Mic STT available · Demo fallback ready'
                     : 'Web Speech unavailable · Demo fallback ready')}
@@ -461,9 +463,9 @@ export default function App() {
                   <span>演示待开始</span>
                 </div>
                 <p className="source-text">
-                  Click Start Interpreting to play the built-in review transcript.
+                  Click Start Interpreting to play the built-in English voice stream.
                 </p>
-                <p className="translated-text">点击开始后，字幕会按时间逐句出现。</p>
+                <p className="translated-text">点击开始后，系统会模拟外语音频输入，并流式生成中文字幕。</p>
               </article>
             )}
             {currentInterim.en && (

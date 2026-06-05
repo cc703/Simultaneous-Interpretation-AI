@@ -1,6 +1,6 @@
 import { useStore } from '../store/index.js';
 import { demoTranscript } from '../mock/demoTranscript.js';
-import { enqueueTTS } from './tts.js';
+import { enqueueTTS, speakOnce } from './tts.js';
 
 let timers = [];
 let fileStopper = null;
@@ -14,20 +14,13 @@ export function startDemoStream({ speed = 0.45 } = {}) {
 
   demoTranscript.forEach((entry, index) => {
     const timer = window.setTimeout(() => {
-      const timestamp = Date.now();
-      useStore.getState().appendSubtitle({
-        timestamp,
-        en: entry.en,
-        zh: entry.zh,
-        corrected: Boolean(entry.termsApplied?.length),
-        correctionType: entry.termsApplied?.length ? 'glossary' : null,
-        termsApplied: entry.termsApplied ?? [],
+      releaseDemoCaption(entry, {
+        onDone: () => {
+          if (index === demoTranscript.length - 1) {
+            useStore.getState().stopTranslation();
+          }
+        },
       });
-      if (useStore.getState().voiceOutput) enqueueTTS(entry.zh);
-
-      if (index === demoTranscript.length - 1) {
-        useStore.getState().stopTranslation();
-      }
     }, Math.round(entry.startMs * speed));
 
     timers.push(timer);
@@ -65,15 +58,7 @@ export function startFileDemoStream(audioElement) {
     demoTranscript.forEach((entry, index) => {
       if (emitted.has(index) || currentMs < entry.startMs) return;
       emitted.add(index);
-      useStore.getState().appendSubtitle({
-        timestamp: Date.now(),
-        en: entry.en,
-        zh: entry.zh,
-        corrected: Boolean(entry.termsApplied?.length),
-        correctionType: entry.termsApplied?.length ? 'glossary' : null,
-        termsApplied: entry.termsApplied ?? [],
-      });
-      if (useStore.getState().voiceOutput) enqueueTTS(entry.zh);
+      releaseDemoCaption(entry);
     });
   };
 
@@ -94,4 +79,46 @@ export function startFileDemoStream(audioElement) {
     audioElement.removeEventListener('timeupdate', releaseDueCaptions);
     audioElement.removeEventListener('ended', handleEnded);
   };
+}
+
+function releaseDemoCaption(entry, { onDone } = {}) {
+  const startedAt = performance.now();
+  speakOnce(entry.en, { lang: 'en-US', rate: 1.05 });
+  useStore.getState().updateCurrentInterim({
+    en: entry.en,
+    zh: '正在生成中文同传...',
+  });
+
+  const chunks = splitChineseChunks(entry.zh);
+  let partial = '';
+
+  chunks.forEach((chunk, index) => {
+    const timer = window.setTimeout(() => {
+      partial += chunk;
+      useStore.getState().updateCurrentInterim({
+        en: entry.en,
+        zh: partial,
+      });
+
+      if (index === chunks.length - 1) {
+        useStore.getState().appendSubtitle({
+          timestamp: Date.now(),
+          en: entry.en,
+          zh: entry.zh,
+          corrected: Boolean(entry.termsApplied?.length),
+          correctionType: entry.termsApplied?.length ? 'glossary' : null,
+          termsApplied: entry.termsApplied ?? [],
+        });
+        if (useStore.getState().voiceOutput) enqueueTTS(entry.zh);
+        useStore.setState({ latencyMs: Math.round(performance.now() - startedAt) });
+        onDone?.();
+      }
+    }, 180 + index * 110);
+    timers.push(timer);
+  });
+}
+
+function splitChineseChunks(text) {
+  const chunks = text.match(/.{1,4}/gu);
+  return chunks?.length ? chunks : [text];
 }

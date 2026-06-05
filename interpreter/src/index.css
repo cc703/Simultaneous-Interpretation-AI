@@ -477,11 +477,29 @@ button {
 .subtitle-card.interim {
   border-left-color: var(--accent);
   background: rgba(0, 212, 255, 0.06);
+  position: relative;
+  overflow: hidden;
+}
+
+.subtitle-card.interim::after {
+  position: absolute;
+  inset: 0;
+  content: "";
+  pointer-events: none;
+  background: linear-gradient(90deg, transparent, rgba(0, 212, 255, 0.12), transparent);
+  transform: translateX(-100%);
+  animation: live-scan 1.4s linear infinite;
 }
 
 .subtitle-card.empty-state {
   border-left-color: var(--green);
   border-style: dashed;
+}
+
+@keyframes live-scan {
+  to {
+    transform: translateX(100%);
+  }
 }
 
 .subtitle-card.selected {

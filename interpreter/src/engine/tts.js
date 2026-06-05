@@ -44,6 +44,17 @@ class TTSEngine {
     this._rate = Number(rate) || 1.1;
   }
 
+  speakOnce(text, { lang = 'zh-CN', rate = this._rate, voice = null } = {}) {
+    if (!text || !this._isAvailable()) return;
+
+    const utterance = new SpeechSynthesisUtterance(text);
+    utterance.voice = voice ?? (lang.startsWith('zh') ? this._voice : this._selectVoiceForLang(lang));
+    utterance.lang = lang;
+    utterance.rate = Number(rate) || this._rate;
+    utterance.pitch = 1.0;
+    speechSynthesis.speak(utterance);
+  }
+
   _processQueue() {
     if (!this._isAvailable()) return;
     if (this._queue.length === 0) {
@@ -81,6 +92,13 @@ class TTSEngine {
       if (found) return found;
     }
     return null;
+  }
+
+  _selectVoiceForLang(lang) {
+    const voices = speechSynthesis.getVoices();
+    return voices.find((voice) => voice.lang === lang)
+      ?? voices.find((voice) => voice.lang?.startsWith(lang.split('-')[0]))
+      ?? null;
   }
 
   _waitForVoices() {
@@ -129,4 +147,8 @@ export function setTTSEnabled(enabled) {
 
 export function setTTSRate(rate) {
   ttsEngine.setRate(rate);
+}
+
+export function speakOnce(text, options) {
+  ttsEngine.speakOnce(text, options);
 }
