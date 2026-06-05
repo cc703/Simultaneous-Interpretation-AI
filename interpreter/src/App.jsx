@@ -8,6 +8,8 @@ import {
   Mic,
   Radio,
   Settings,
+  Languages,
+  ListChecks,
   Sparkles,
   Upload,
   Wand2,
@@ -96,6 +98,7 @@ export default function App() {
   const [fileStatus, setFileStatus] = useState('');
   const [liveStatus, setLiveStatus] = useState('');
   const [settingsOpen, setSettingsOpen] = useState(false);
+  const [configTab, setConfigTab] = useState('translate');
   const audioRef = useRef(null);
   const displaySubtitles = subtitles;
   const hasSubtitles = displaySubtitles.length > 0;
@@ -494,97 +497,134 @@ export default function App() {
             )}
           </section>
 
-          <section className="panel-block">
-            <h2>Provider</h2>
-            <div className="field-line">
-              <span>{provider}</span>
-              <code>openai-compatible</code>
+          <section className="panel-block config-panel">
+            <h2>Configuration</h2>
+            <div className="config-tabs" aria-label="Configuration sections">
+              <button
+                type="button"
+                className={configTab === 'translate' ? 'active' : ''}
+                onClick={() => setConfigTab('translate')}
+              >
+                <Languages size={14} />
+                Translate
+              </button>
+              <button
+                type="button"
+                className={configTab === 'asr' ? 'active' : ''}
+                onClick={() => setConfigTab('asr')}
+              >
+                <Captions size={14} />
+                ASR
+              </button>
+              <button
+                type="button"
+                className={configTab === 'glossary' ? 'active' : ''}
+                onClick={() => setConfigTab('glossary')}
+              >
+                <ListChecks size={14} />
+                Terms
+              </button>
             </div>
-            <select
-              className="settings-control"
-              aria-label="Provider"
-              value={provider}
-              onChange={(event) => setProvider(event.target.value)}
-            >
-              <option value="deepseek">DeepSeek</option>
-              <option value="openai">OpenAI</option>
-              <option value="custom">Custom</option>
-            </select>
-            {provider === 'custom' && (
-              <input
-                className="settings-control"
-                aria-label="Custom base URL"
-                placeholder="https://api.example.com/v1"
-                value={baseUrl}
-                onChange={(event) => setBaseUrl(event.target.value)}
-              />
-            )}
-            <input
-              className="settings-control"
-              aria-label="API key"
-              placeholder="API key (memory only)"
-              type="password"
-              value={apiKey}
-              onChange={(event) => setApiKey(event.target.value)}
-            />
-            <div className="secret-input">API key stays in memory and is not saved to localStorage</div>
-          </section>
 
-          <section className="panel-block">
-            <h2>File ASR</h2>
-            <select
-              className="settings-control"
-              aria-label="ASR model"
-              value={asrModel}
-              onChange={(event) => setAsrModel(event.target.value)}
-            >
-              <option value="gpt-4o-mini-transcribe">gpt-4o-mini-transcribe</option>
-              <option value="gpt-4o-transcribe">gpt-4o-transcribe</option>
-              <option value="whisper-1">whisper-1</option>
-            </select>
-            <input
-              className="settings-control"
-              aria-label="ASR base URL"
-              placeholder="https://api.openai.com/v1"
-              value={asrBaseUrl}
-              onChange={(event) => setAsrBaseUrl(event.target.value)}
-            />
-            <input
-              className="settings-control"
-              aria-label="ASR API key"
-              placeholder="OpenAI ASR key (memory only)"
-              type="password"
-              value={asrApiKey}
-              onChange={(event) => setAsrApiKey(event.target.value)}
-            />
-            <div className="secret-input">File mode uses /audio/transcriptions when this key is present</div>
-          </section>
-
-          <section className="panel-block">
-            <h2>Glossary</h2>
-            <div className="glossary-list">
-              {glossary.map((term) => (
-                <div className={term.enabled ? 'term enabled' : 'term'} key={term.id ?? term.source}>
-                  <span>{term.source}</span>
-                  <strong>{term.target}</strong>
+            {configTab === 'translate' && (
+              <div className="config-body">
+                <div className="field-line compact">
+                  <span>{provider}</span>
+                  <code>{apiKey ? 'key ready' : 'key needed'}</code>
                 </div>
-              ))}
-            </div>
-            <div className="term-form">
-              <input
-                aria-label="Glossary source"
-                placeholder="source term"
-                value={termSource}
-                onChange={(event) => setTermSource(event.target.value)}
-              />
-              <input
-                aria-label="Glossary target"
-                placeholder="中文译法"
-                value={termTarget}
-                onChange={(event) => setTermTarget(event.target.value)}
-              />
-              <button type="button" onClick={handleAddTerm}>Add term</button>
-            </div>
+                <select
+                  className="settings-control"
+                  aria-label="Provider"
+                  value={provider}
+                  onChange={(event) => setProvider(event.target.value)}
+                >
+                  <option value="deepseek">DeepSeek</option>
+                  <option value="openai">OpenAI</option>
+                  <option value="custom">Custom</option>
+                </select>
+                {provider === 'custom' && (
+                  <input
+                    className="settings-control"
+                    aria-label="Custom base URL"
+                    placeholder="https://api.example.com/v1"
+                    value={baseUrl}
+                    onChange={(event) => setBaseUrl(event.target.value)}
+                  />
+                )}
+                <input
+                  className="settings-control"
+                  aria-label="API key"
+                  placeholder="Translation API key (memory only)"
+                  type="password"
+                  value={apiKey}
+                  onChange={(event) => setApiKey(event.target.value)}
+                />
+                <div className="secret-input">Translation key is memory only</div>
+              </div>
+            )}
+
+            {configTab === 'asr' && (
+              <div className="config-body">
+                <div className="field-line compact">
+                  <span>{asrModel}</span>
+                  <code>{asrApiKey ? 'key ready' : 'key needed'}</code>
+                </div>
+                <select
+                  className="settings-control"
+                  aria-label="ASR model"
+                  value={asrModel}
+                  onChange={(event) => setAsrModel(event.target.value)}
+                >
+                  <option value="gpt-4o-mini-transcribe">gpt-4o-mini-transcribe</option>
+                  <option value="gpt-4o-transcribe">gpt-4o-transcribe</option>
+                  <option value="whisper-1">whisper-1</option>
+                </select>
+                <input
+                  className="settings-control"
+                  aria-label="ASR base URL"
+                  placeholder="https://api.openai.com/v1"
+                  value={asrBaseUrl}
+                  onChange={(event) => setAsrBaseUrl(event.target.value)}
+                />
+                <input
+                  className="settings-control"
+                  aria-label="ASR API key"
+                  placeholder="ASR API key (memory only)"
+                  type="password"
+                  value={asrApiKey}
+                  onChange={(event) => setAsrApiKey(event.target.value)}
+                />
+                <div className="secret-input">File and Live modes use /audio/transcriptions</div>
+              </div>
+            )}
+
+            {configTab === 'glossary' && (
+              <div className="config-body">
+                <div className="glossary-list compact-list">
+                  {glossary.map((term) => (
+                    <div className={term.enabled ? 'term enabled' : 'term'} key={term.id ?? term.source}>
+                      <span>{term.source}</span>
+                      <strong>{term.target}</strong>
+                    </div>
+                  ))}
+                </div>
+                <div className="term-form">
+                  <input
+                    aria-label="Glossary source"
+                    placeholder="source term"
+                    value={termSource}
+                    onChange={(event) => setTermSource(event.target.value)}
+                  />
+                  <input
+                    aria-label="Glossary target"
+                    placeholder="中文译法"
+                    value={termTarget}
+                    onChange={(event) => setTermTarget(event.target.value)}
+                  />
+                  <button type="button" onClick={handleAddTerm}>Add term</button>
+                </div>
+              </div>
+            )}
           </section>
 
           <section className="panel-block">
