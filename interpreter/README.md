@@ -6,11 +6,11 @@
 
 ## 当前阶段
 
-PR-09：字幕导出功能。
+PR-08：文件上传模式。
 
-当前已建立 Vite + React + Tailwind CSS 基础工程，完成同传字幕工作台的静态界面，接入 Web Speech API STT 封装，实现 OpenAI-compatible 流式翻译引擎，完成可演示的翻译修正闭环，加入稳定 Demo 模式，并支持导出 SRT / 复制双语文本。页面包含输入源选择、Provider 配置、术语表、字幕设置、时间轴字幕流、修正编辑器、底部大字幕和统计栏。
+当前已建立 Vite + React + Tailwind CSS 基础工程，完成同传字幕工作台的静态界面，接入 Web Speech API STT 封装，实现 OpenAI-compatible 流式翻译引擎，完成可演示的翻译修正闭环，加入稳定 Demo 模式，支持文件上传播放驱动时间轴字幕流，并支持导出 SRT / 复制双语文本。页面包含输入源选择、Provider 配置、术语表、字幕设置、时间轴字幕流、修正编辑器、底部大字幕和统计栏。
 
-后续会继续补充文件/直播音频入口、设置面板、波形增强、TTS 和最终 Demo 材料。
+后续会继续补充直播音频入口、设置面板、波形增强、TTS、ASR Adapter 和最终 Demo 材料。
 
 ## 快速开始
 
@@ -49,6 +49,14 @@ Chrome 或 Edge 中打开本地页面，点击 `Start Interpreting` 后授权麦
 3. 字幕会按时间逐条出现，而不是一次性显示全部内容。
 4. 示例脚本包含 `latency budget`、`pitch deck`、`edge device` 三个术语。
 5. Demo 字幕仍可继续执行人工修正、添加术语和术语重译。
+
+## 文件模式验证
+
+1. 点击输入源 `File`，上传 `.mp3`、`.mp4`、`.wav`、`.m4a`、`.webm` 或 `.ogg` 文件。
+2. 左侧会显示文件名、大小、格式和时长。
+3. 点击 `Start Interpreting` 后，文件会自动播放，进度条跟随 `audio.currentTime` 推进。
+4. 当前 MVP 使用内置演示转写流按文件播放进度释放字幕，稳定展示“文件播放 -> 字幕流 -> 修正 -> 导出”闭环。
+5. 这不是任意音频文件的真实 ASR 识别；真实文件音频分片 ASR 会作为后续 ASR Adapter 扩展。
 
 ## 导出验证
 

@@ -1,8 +1,9 @@
-import { useEffect, useMemo, useState } from 'react';
+import { useEffect, useMemo, useRef, useState } from 'react';
 import { mockGlossary, mockSubtitles } from './mock/subtitles.js';
 import {
   isSTTSupported,
   startDemoStream,
+  startFileDemoStream,
   startSTTSession,
   stopDemoStream,
   stopSTTSession,
@@ -20,6 +21,7 @@ export default function App() {
   const correctionCount = useStore((state) => state.correctionCount);
   const selectedSubtitleId = useStore((state) => state.selectedSubtitleId);
   const setSourceMode = useStore((state) => state.setSourceMode);
+  const setUploadedFile = useStore((state) => state.setUploadedFile);
   const addGlossaryTerm = useStore((state) => state.addGlossaryTerm);
   const selectSubtitle = useStore((state) => state.selectSubtitle);
   const updateSubtitleTranslation = useStore((state) => state.updateSubtitleTranslation);
@@ -27,6 +29,10 @@ export default function App() {
   const [draftZh, setDraftZh] = useState('');
   const [termSource, setTermSource] = useState('');
   const [termTarget, setTermTarget] = useState('');
+  const [fileUrl, setFileUrl] = useState('');
+  const [fileMeta, setFileMeta] = useState(null);
+  const [fileProgress, setFileProgress] = useState(0);
+  const audioRef = useRef(null);
   const displaySubtitles = subtitles.length > 0 ? subtitles : mockSubtitles;
   const selectedSubtitle = useMemo(() => (
     displaySubtitles.find((subtitle) => subtitle.id === selectedSubtitleId)
@@ -44,9 +50,13 @@ export default function App() {
     setDraftZh(selectedSubtitle?.zh ?? '');
   }, [selectedSubtitle?.id, selectedSubtitle?.zh]);
 
+  useEffect(() => () => {
+    if (fileUrl) URL.revokeObjectURL(fileUrl);
+  }, [fileUrl]);
+
   const handleRunClick = () => {
     if (isRunning) {
-      if (sourceMode === 'demo') {
+      if (sourceMode === 'demo' || sourceMode === 'file') {
         stopDemoStream();
         useStore.getState().stopTranslation();
       } else {
@@ -57,6 +67,11 @@ export default function App() {
 
     if (sourceMode === 'mic') {
       startSTTSession();
+      return;
+    }
+
+    if (sourceMode === 'file') {
+      startFileDemoStream(audioRef.current);
       return;
     }
 
@@ -90,6 +105,36 @@ export default function App() {
 
   const handleCopy = async () => {
     await copyBilingual(displaySubtitles);
+  };
+
+  const handleFileChange = (event) => {
+    const file = event.target.files?.[0];
+    if (!file) return;
+
+    if (fileUrl) URL.revokeObjectURL(fileUrl);
+    const nextUrl = URL.createObjectURL(file);
+    setUploadedFile(file);
+    setFileUrl(nextUrl);
+    setFileMeta({
+      name: file.name,
+      type: file.type || 'unknown',
+      size: file.size,
+      duration: 0,
+    });
+    setFileProgress(0);
+    setSourceMode('file');
+  };
+
+  const handleAudioMetadata = () => {
+    const duration = audioRef.current?.duration;
+    if (!Number.isFinite(duration)) return;
+    setFileMeta((current) => current ? { ...current, duration } : current);
+  };
+
+  const handleAudioTimeUpdate = () => {
+    const audio = audioRef.current;
+    if (!audio || !Number.isFinite(audio.duration) || audio.duration === 0) return;
+    setFileProgress(audio.currentTime / audio.duration);
   };
 
   return (
@@ -131,18 +176,54 @@ export default function App() {
               >
                 Mic
               </button>
-              <button type="button" onClick={() => setSourceMode('file')}>File</button>
+              <button
+                type="button"
+                className={sourceMode === 'file' ? 'active' : ''}
+                onClick={() => setSourceMode('file')}
+              >
+                File
+              </button>
               <button type="button" onClick={() => setSourceMode('live')}>Live</button>
             </div>
             <div className="source-card">
-              <strong>Global AI Product Launch</strong>
+              <strong>{sourceMode === 'file' ? (fileMeta?.name ?? 'Upload an audio/video file') : 'Global AI Product Launch'}</strong>
               <span>
-                {sourceMode === 'demo'
+                {sourceMode === 'file'
+                  ? 'File playback drives the same timestamped caption stream'
+                  : sourceMode === 'demo'
                   ? 'Stable review demo · captions stream by timeline'
                   : (isSTTSupported()
                     ? 'Mic STT available · Demo fallback ready'
                     : 'Web Speech unavailable · Demo fallback ready')}
               </span>
+            </div>
+            <div className="file-uploader">
+              <label>
+                <span>Upload media</span>
+                <input
+                  accept=".mp3,.mp4,.wav,.m4a,.webm,.ogg,audio/*,video/*"
+                  type="file"
+                  onChange={handleFileChange}
+                />
+              </label>
+              {fileMeta && (
+                <div className="file-meta">
+                  <span>{formatBytes(fileMeta.size)}</span>
+                  <span>{fileMeta.duration ? formatDuration(fileMeta.duration) : 'duration pending'}</span>
+                  <span>{fileMeta.type}</span>
+                </div>
+              )}
+              {fileUrl && (
+                <audio
+                  ref={audioRef}
+                  controls
+                  src={fileUrl}
+                  onLoadedMetadata={handleAudioMetadata}
+                  onTimeUpdate={handleAudioTimeUpdate}
+                >
+                  <track kind="captions" />
+                </audio>
+              )}
             </div>
           </section>
 
@@ -224,7 +305,9 @@ export default function App() {
               />
             ))}
           </div>
-          <div className="progress-track"><span /></div>
+          <div className="progress-track">
+            <span style={{ width: sourceMode === 'file' ? `${Math.round(fileProgress * 100)}%` : undefined }} />
+          </div>
 
           <div className="subtitle-scroll">
             {displaySubtitles.length === 0 && !currentInterim.en && (
@@ -304,6 +387,20 @@ export default function App() {
       </main>
     </div>
   );
+}
+
+function formatBytes(bytes) {
+  if (!bytes) return '0 B';
+  const units = ['B', 'KB', 'MB', 'GB'];
+  const index = Math.min(Math.floor(Math.log(bytes) / Math.log(1024)), units.length - 1);
+  return `${(bytes / (1024 ** index)).toFixed(index === 0 ? 0 : 1)} ${units[index]}`;
+}
+
+function formatDuration(seconds) {
+  const safe = Math.max(0, Math.floor(seconds));
+  const minutes = String(Math.floor(safe / 60)).padStart(2, '0');
+  const rest = String(safe % 60).padStart(2, '0');
+  return `${minutes}:${rest}`;
 }
 
 function correctionLabel(type) {

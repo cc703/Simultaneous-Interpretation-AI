@@ -13,6 +13,7 @@ export {
 } from './translator.js';
 export {
   getDemoTranscript,
+  startFileDemoStream,
   startDemoStream,
   stopDemoStream,
 } from './demoStream.js';
