@@ -199,6 +199,17 @@ button {
   background: rgba(0, 212, 255, 0.04);
 }
 
+.settings-control {
+  width: 100%;
+  min-height: 36px;
+  margin-top: 10px;
+  border: 1px solid var(--border);
+  border-radius: 6px;
+  padding: 0 10px;
+  color: var(--text);
+  background: #080d11;
+}
+
 .file-uploader {
   display: grid;
   gap: 10px;
@@ -571,6 +582,83 @@ textarea.editor-preview {
 .stats-bar {
   border-top: 1px solid var(--border);
   border-bottom: 0;
+}
+
+.modal-backdrop {
+  position: fixed;
+  inset: 0;
+  z-index: 20;
+  display: grid;
+  place-items: center;
+  padding: 18px;
+  background: rgba(1, 6, 9, 0.76);
+  backdrop-filter: blur(14px);
+}
+
+.settings-modal {
+  width: min(520px, 100%);
+  display: grid;
+  gap: 14px;
+  padding: 18px;
+  border: 1px solid rgba(0, 212, 255, 0.32);
+  border-radius: 8px;
+  background: #0d1318;
+  box-shadow: 0 24px 90px rgba(0, 0, 0, 0.42);
+}
+
+.settings-modal header {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 12px;
+  padding-bottom: 12px;
+  border-bottom: 1px solid var(--border);
+}
+
+.settings-modal h2 {
+  margin: 0;
+  font: 800 20px/1 "Syne", sans-serif;
+}
+
+.settings-modal p {
+  margin: 6px 0 0;
+  color: var(--muted);
+}
+
+.settings-modal header button,
+.settings-modal select,
+.settings-modal input[type="number"] {
+  min-height: 36px;
+  border: 1px solid var(--border);
+  border-radius: 6px;
+  color: var(--text);
+  background: #080d11;
+}
+
+.settings-modal header button {
+  padding: 0 12px;
+}
+
+.settings-modal label {
+  display: grid;
+  gap: 7px;
+  color: var(--muted);
+  font-size: 13px;
+}
+
+.settings-modal select,
+.settings-modal input[type="number"] {
+  width: 100%;
+  padding: 0 10px;
+}
+
+.modal-toggle {
+  grid-template-columns: auto 1fr;
+  align-items: center;
+}
+
+.modal-toggle input {
+  accent-color: var(--accent);
 }
 
 @media (max-width: 980px) {

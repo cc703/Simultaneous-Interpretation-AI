@@ -6,11 +6,11 @@
 
 ## 当前阶段
 
-PR-07：系统音频捕获（直播模式）。
+PR-11：高级设置面板。
 
-当前已建立 Vite + React + Tailwind CSS 基础工程，完成同传字幕工作台的静态界面，接入 Web Speech API STT 封装，实现 OpenAI-compatible 流式翻译引擎，完成可演示的翻译修正闭环，加入稳定 Demo 模式，支持文件上传播放驱动时间轴字幕流，支持直播标签页/屏幕音频捕获入口，并支持导出 SRT / 复制双语文本。页面包含输入源选择、Provider 配置、术语表、字幕设置、时间轴字幕流、修正编辑器、底部大字幕和统计栏。
+当前已建立 Vite + React + Tailwind CSS 基础工程，完成同传字幕工作台的静态界面，接入 Web Speech API STT 封装，实现 OpenAI-compatible 流式翻译引擎，完成可演示的翻译修正闭环，加入稳定 Demo 模式，支持文件上传播放驱动时间轴字幕流，支持直播标签页/屏幕音频捕获入口，支持高级设置面板，并支持导出 SRT / 复制双语文本。页面包含输入源选择、Provider 配置、术语表、字幕设置、时间轴字幕流、修正编辑器、底部大字幕和统计栏。
 
-后续会继续补充设置面板、波形增强、TTS、ASR Adapter 和最终 Demo 材料。
+后续会继续补充波形增强、TTS、ASR Adapter 和最终 Demo 材料。
 
 ## 快速开始
 
@@ -64,6 +64,13 @@ Chrome 或 Edge 中打开本地页面，点击 `Start Interpreting` 后授权麦
 2. 点击 `Choose tab audio`，选择一个带英文音频的浏览器标签页或屏幕。
 3. 左侧会显示捕获来源名称，并可点击 `Stop live capture` 释放所有音频 track。
 4. 当前 MVP 证明直播音频入口、权限流和资源释放；Web Speech API 不能直接消费该系统音频流，直接 ASR 识别会在 ASR Adapter 中扩展。
+
+## 设置面板验证
+
+- 顶部点击 `Settings` 可打开高级设置面板。
+- 支持配置目标语言、翻译风格、上下文窗口、音频分片长度和专业词汇增强。
+- Provider、Custom Base URL 和翻译参数会保存到 localStorage。
+- API Key 只保存在当前内存状态中，不写入 localStorage。
 
 ## 导出验证
 

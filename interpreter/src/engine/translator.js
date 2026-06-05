@@ -39,6 +39,8 @@ export async function* streamTranslate({
   text,
   context = '',
   glossary = '',
+  targetLanguage = 'zh-CN',
+  translationStyle = 'formal',
   provider = 'deepseek',
   apiKey = '',
   baseUrl = '',
@@ -64,7 +66,7 @@ export async function* streamTranslate({
       stream: true,
       temperature: 0.2,
       messages: [
-        { role: 'system', content: buildSystemPrompt({ context, glossary }) },
+        { role: 'system', content: buildSystemPrompt({ context, glossary, targetLanguage, translationStyle }) },
         { role: 'user', content: text },
       ],
     }),
@@ -87,14 +89,20 @@ export function resolveProviderConfig({ provider, baseUrl, model }) {
   };
 }
 
-export function buildSystemPrompt({ context, glossary }) {
+export function buildSystemPrompt({ context, glossary, targetLanguage = 'zh-CN', translationStyle = 'formal' }) {
+  const styleLabel = {
+    formal: '正式、适合会议和学术场景',
+    casual: '自然口语、适合访谈和直播',
+    technical: '技术准确、适合产品发布和工程分享',
+  }[translationStyle] ?? translationStyle;
+
   return [
     '你是一名专业同声传译员。将用户提供的英文片段翻译成自然流畅的中文。',
     '',
     '规则：',
     '1. 直接输出译文，不加任何解释或前缀。',
     '2. 保持专业术语准确性。',
-    '3. 根据上下文调整语气，适配会议、课堂、发布会和技术分享场景。',
+    `3. 目标语言：${targetLanguage}。翻译风格：${styleLabel}。`,
     '4. 如果术语表中出现匹配项，必须优先使用指定中文译法。',
     '',
     '上下文参考：',

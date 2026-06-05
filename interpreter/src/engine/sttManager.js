@@ -47,8 +47,10 @@ function wireEngineToStore(engine) {
       try {
         for await (const token of streamTranslate({
           text,
-          context: buildContext(store.subtitles),
-          glossary: buildGlossaryPrompt(store.glossary),
+          context: buildContext(store.subtitles, store.contextWindow),
+          glossary: store.terminologyBoost ? buildGlossaryPrompt(store.glossary) : '',
+          targetLanguage: store.targetLanguage,
+          translationStyle: store.translationStyle,
           provider: store.provider,
           apiKey: store.apiKey,
           baseUrl: store.baseUrl,

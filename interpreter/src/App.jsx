@@ -18,6 +18,14 @@ export default function App() {
   const latencyMs = useStore((state) => state.latencyMs);
   const currentInterim = useStore((state) => state.currentInterim);
   const sourceMode = useStore((state) => state.sourceMode);
+  const provider = useStore((state) => state.provider);
+  const apiKey = useStore((state) => state.apiKey);
+  const baseUrl = useStore((state) => state.baseUrl);
+  const targetLanguage = useStore((state) => state.targetLanguage);
+  const translationStyle = useStore((state) => state.translationStyle);
+  const contextWindow = useStore((state) => state.contextWindow);
+  const chunkSeconds = useStore((state) => state.chunkSeconds);
+  const terminologyBoost = useStore((state) => state.terminologyBoost);
   const captureStream = useStore((state) => state.captureStream);
   const captureSourceLabel = useStore((state) => state.captureSourceLabel);
   const isCapturing = useStore((state) => state.isCapturing);
@@ -26,6 +34,14 @@ export default function App() {
   const correctionCount = useStore((state) => state.correctionCount);
   const selectedSubtitleId = useStore((state) => state.selectedSubtitleId);
   const setSourceMode = useStore((state) => state.setSourceMode);
+  const setProvider = useStore((state) => state.setProvider);
+  const setApiKey = useStore((state) => state.setApiKey);
+  const setBaseUrl = useStore((state) => state.setBaseUrl);
+  const setTargetLanguage = useStore((state) => state.setTargetLanguage);
+  const setTranslationStyle = useStore((state) => state.setTranslationStyle);
+  const setContextWindow = useStore((state) => state.setContextWindow);
+  const setChunkSeconds = useStore((state) => state.setChunkSeconds);
+  const setTerminologyBoost = useStore((state) => state.setTerminologyBoost);
   const setUploadedFile = useStore((state) => state.setUploadedFile);
   const setCaptureStream = useStore((state) => state.setCaptureStream);
   const addGlossaryTerm = useStore((state) => state.addGlossaryTerm);
@@ -38,6 +54,7 @@ export default function App() {
   const [fileUrl, setFileUrl] = useState('');
   const [fileMeta, setFileMeta] = useState(null);
   const [fileProgress, setFileProgress] = useState(0);
+  const [settingsOpen, setSettingsOpen] = useState(false);
   const audioRef = useRef(null);
   const displaySubtitles = subtitles.length > 0 ? subtitles : mockSubtitles;
   const selectedSubtitle = useMemo(() => (
@@ -177,6 +194,7 @@ export default function App() {
           {isRunning ? `${sourceMode} stream active` : 'Demo stream ready'}
         </div>
         <div className="top-actions" aria-label="Header actions">
+          <button type="button" onClick={() => setSettingsOpen(true)}>Settings</button>
           <button type="button" onClick={handleExport}>Export</button>
           <button type="button" onClick={handleCopy}>Copy</button>
         </div>
@@ -281,10 +299,37 @@ export default function App() {
           <section className="panel-block">
             <h2>Provider</h2>
             <div className="field-line">
-              <span>DeepSeek</span>
+              <span>{provider}</span>
               <code>openai-compatible</code>
             </div>
-            <div className="secret-input">API key is local only</div>
+            <select
+              className="settings-control"
+              aria-label="Provider"
+              value={provider}
+              onChange={(event) => setProvider(event.target.value)}
+            >
+              <option value="deepseek">DeepSeek</option>
+              <option value="openai">OpenAI</option>
+              <option value="custom">Custom</option>
+            </select>
+            {provider === 'custom' && (
+              <input
+                className="settings-control"
+                aria-label="Custom base URL"
+                placeholder="https://api.example.com/v1"
+                value={baseUrl}
+                onChange={(event) => setBaseUrl(event.target.value)}
+              />
+            )}
+            <input
+              className="settings-control"
+              aria-label="API key"
+              placeholder="API key (memory only)"
+              type="password"
+              value={apiKey}
+              onChange={(event) => setApiKey(event.target.value)}
+            />
+            <div className="secret-input">API key stays in memory and is not saved to localStorage</div>
           </section>
 
           <section className="panel-block">
@@ -432,10 +477,67 @@ export default function App() {
             <span>Translated {displaySubtitles.length}</span>
             <span>Corrections {correctionCount}</span>
             <span>Glossary {glossary.length}</span>
-            <span>Provider DeepSeek</span>
+            <span>Provider {provider}</span>
           </footer>
         </section>
       </main>
+
+      {settingsOpen && (
+        <div className="modal-backdrop" role="presentation">
+          <section className="settings-modal" aria-label="Advanced settings">
+            <header>
+              <div>
+                <h2>Advanced Settings</h2>
+                <p>实时影响后续翻译，不需要重启会话。</p>
+              </div>
+              <button type="button" onClick={() => setSettingsOpen(false)}>Close</button>
+            </header>
+            <label>
+              <span>翻译语言</span>
+              <select value={targetLanguage} onChange={(event) => setTargetLanguage(event.target.value)}>
+                <option value="zh-CN">{'英语 -> 中文（简体）'}</option>
+                <option value="zh-TW">{'英语 -> 中文（繁体）'}</option>
+              </select>
+            </label>
+            <label>
+              <span>翻译风格</span>
+              <select value={translationStyle} onChange={(event) => setTranslationStyle(event.target.value)}>
+                <option value="formal">正式（学术/会议）</option>
+                <option value="casual">口语（访谈/直播）</option>
+                <option value="technical">技术（发布会/工程）</option>
+              </select>
+            </label>
+            <label>
+              <span>上下文窗口：{contextWindow}</span>
+              <input
+                min="2"
+                max="12"
+                type="number"
+                value={contextWindow}
+                onChange={(event) => setContextWindow(event.target.value)}
+              />
+            </label>
+            <label>
+              <span>音频分片长度：{chunkSeconds}s</span>
+              <input
+                min="2"
+                max="10"
+                type="number"
+                value={chunkSeconds}
+                onChange={(event) => setChunkSeconds(event.target.value)}
+              />
+            </label>
+            <label className="modal-toggle">
+              <input
+                checked={terminologyBoost}
+                type="checkbox"
+                onChange={(event) => setTerminologyBoost(event.target.checked)}
+              />
+              <span>专业词汇增强</span>
+            </label>
+          </section>
+        </div>
+      )}
     </div>
   );
 }

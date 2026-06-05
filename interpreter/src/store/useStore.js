@@ -25,6 +25,24 @@ const normalizeSubtitle = (entry, state) => {
   };
 };
 
+const SETTINGS_STORAGE_KEY = 'simulcast-interpreter-settings';
+
+const loadSavedSettings = () => {
+  if (typeof window === 'undefined') return {};
+  try {
+    return JSON.parse(window.localStorage.getItem(SETTINGS_STORAGE_KEY) ?? '{}');
+  } catch {
+    return {};
+  }
+};
+
+const persistSettings = (settings) => {
+  if (typeof window === 'undefined') return;
+  window.localStorage.setItem(SETTINGS_STORAGE_KEY, JSON.stringify(settings));
+};
+
+const savedSettings = loadSavedSettings();
+
 export const useStore = create((set, get) => ({
   // 音频源
   sourceMode: 'demo',
@@ -35,9 +53,14 @@ export const useStore = create((set, get) => ({
   demoEnabled: false,
 
   // AI Provider 配置
-  provider: 'deepseek',
+  provider: savedSettings.provider ?? 'deepseek',
   apiKey: '',
-  baseUrl: '',
+  baseUrl: savedSettings.baseUrl ?? '',
+  targetLanguage: savedSettings.targetLanguage ?? 'zh-CN',
+  translationStyle: savedSettings.translationStyle ?? 'formal',
+  contextWindow: savedSettings.contextWindow ?? 6,
+  chunkSeconds: savedSettings.chunkSeconds ?? 4,
+  terminologyBoost: savedSettings.terminologyBoost ?? true,
 
   // 运行状态
   isRunning: false,
@@ -78,9 +101,47 @@ export const useStore = create((set, get) => ({
   }),
   setIsCapturing: (isCapturing) => set({ isCapturing }),
 
-  setProvider: (provider) => set({ provider }),
+  setProvider: (provider) => {
+    set({ provider });
+    get().persistUserSettings();
+  },
   setApiKey: (apiKey) => set({ apiKey }),
-  setBaseUrl: (baseUrl) => set({ baseUrl }),
+  setBaseUrl: (baseUrl) => {
+    set({ baseUrl });
+    get().persistUserSettings();
+  },
+  setTargetLanguage: (targetLanguage) => {
+    set({ targetLanguage });
+    get().persistUserSettings();
+  },
+  setTranslationStyle: (translationStyle) => {
+    set({ translationStyle });
+    get().persistUserSettings();
+  },
+  setContextWindow: (contextWindow) => {
+    set({ contextWindow: Number(contextWindow) });
+    get().persistUserSettings();
+  },
+  setChunkSeconds: (chunkSeconds) => {
+    set({ chunkSeconds: Number(chunkSeconds) });
+    get().persistUserSettings();
+  },
+  setTerminologyBoost: (terminologyBoost) => {
+    set({ terminologyBoost });
+    get().persistUserSettings();
+  },
+  persistUserSettings: () => {
+    const state = get();
+    persistSettings({
+      provider: state.provider,
+      baseUrl: state.baseUrl,
+      targetLanguage: state.targetLanguage,
+      translationStyle: state.translationStyle,
+      contextWindow: state.contextWindow,
+      chunkSeconds: state.chunkSeconds,
+      terminologyBoost: state.terminologyBoost,
+    });
+  },
 
   startTranslation: () => set({
     isRunning: true,
