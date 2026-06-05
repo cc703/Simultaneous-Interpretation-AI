@@ -10,7 +10,7 @@ import {
   Settings,
   Languages,
   ListChecks,
-  Sparkles,
+  PlayCircle,
   Upload,
   Wand2,
 } from 'lucide-react';
@@ -428,14 +428,14 @@ export default function App() {
           </span>
           <div>
             <h1>Simulcast Interpreter</h1>
-            <p>Topic 2 · AI 同声传译助手</p>
+            <p>Topic 2 · 实时英中同传工作台</p>
           </div>
         </div>
         <div className="status-pill">
           <span />
           {isRunning
-            ? `${sourceMode} audio -> Chinese live`
-            : 'Demo audio stream ready'}
+            ? `${sourceMode} audio -> Chinese captions`
+            : 'Interpreter console ready'}
         </div>
         <div className="top-actions" aria-label="Header actions">
           <button type="button" onClick={() => setSettingsOpen(true)}>
@@ -461,7 +461,7 @@ export default function App() {
               ))}
             </div>
             <div className="next-action">
-              <Sparkles size={16} />
+              <PlayCircle size={16} />
               <span>{nextAction}</span>
             </div>
           </section>
