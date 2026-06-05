@@ -46,6 +46,7 @@ const savedSettings = loadSavedSettings();
 export const useStore = create((set, get) => ({
   // 音频源
   sourceMode: 'demo',
+  demoScenarioId: 'launch',
   uploadedFile: null,
   captureStream: null,
   captureSourceLabel: '',
@@ -99,6 +100,7 @@ export const useStore = create((set, get) => ({
     sourceMode,
     demoEnabled: sourceMode === 'demo',
   }),
+  setDemoScenarioId: (demoScenarioId) => set({ demoScenarioId }),
   setUploadedFile: (uploadedFile) => set({ uploadedFile }),
   setCaptureStream: (captureStream, captureSourceLabel = '') => set({
     captureStream,
@@ -281,6 +283,17 @@ export const useStore = create((set, get) => ({
     ],
   })),
 
+  replaceGlossaryTerms: (terms = []) => set({
+    glossary: terms.map((term) => ({
+      id: nanoid(),
+      source: term.source,
+      target: term.target,
+      note: term.note ?? '场景预设',
+      enabled: term.enabled ?? true,
+      createdAt: Date.now(),
+    })),
+  }),
+
   updateGlossaryTerm: (id, updates) => set((state) => ({
     glossary: state.glossary.map((term) => (
       term.id === id ? { ...term, ...updates } : term
@@ -322,6 +335,7 @@ export const useStore = create((set, get) => ({
   },
 
   resetSession: () => set({
+    demoScenarioId: 'launch',
     uploadedFile: null,
     captureStream: null,
     captureSourceLabel: '',

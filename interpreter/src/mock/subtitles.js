@@ -1,3 +1,5 @@
+import { getDemoScenario } from './demoTranscript.js';
+
 export const mockSubtitles = [
   {
     id: 'sub-001',
@@ -56,8 +58,6 @@ export const mockSubtitles = [
   },
 ];
 
-export const mockGlossary = [
-  { source: 'latency budget', target: '延迟预算', enabled: true },
-  { source: 'pitch deck', target: '融资演示文稿', enabled: true },
-  { source: 'edge device', target: '边缘设备', enabled: false },
-];
+export { getDemoScenario };
+
+export const mockGlossary = getDemoScenario().terms;

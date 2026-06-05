@@ -15,6 +15,7 @@ import {
   Wand2,
 } from 'lucide-react';
 import { mockGlossary } from './mock/subtitles.js';
+import { demoScenarios, getDemoScenario } from './mock/demoTranscript.js';
 import {
   isSTTSupported,
   startDemoStream,
@@ -46,6 +47,7 @@ export default function App() {
   const currentInterim = useStore((state) => state.currentInterim);
   const waveformData = useStore((state) => state.waveformData);
   const sourceMode = useStore((state) => state.sourceMode);
+  const demoScenarioId = useStore((state) => state.demoScenarioId);
   const provider = useStore((state) => state.provider);
   const apiKey = useStore((state) => state.apiKey);
   const baseUrl = useStore((state) => state.baseUrl);
@@ -73,6 +75,7 @@ export default function App() {
   const correctionHistory = useStore((state) => state.correctionHistory);
   const selectedSubtitleId = useStore((state) => state.selectedSubtitleId);
   const setSourceMode = useStore((state) => state.setSourceMode);
+  const setDemoScenarioId = useStore((state) => state.setDemoScenarioId);
   const setProvider = useStore((state) => state.setProvider);
   const setApiKey = useStore((state) => state.setApiKey);
   const setBaseUrl = useStore((state) => state.setBaseUrl);
@@ -94,6 +97,7 @@ export default function App() {
   const setUploadedFile = useStore((state) => state.setUploadedFile);
   const setCaptureStream = useStore((state) => state.setCaptureStream);
   const addGlossaryTerm = useStore((state) => state.addGlossaryTerm);
+  const replaceGlossaryTerms = useStore((state) => state.replaceGlossaryTerms);
   const selectSubtitle = useStore((state) => state.selectSubtitle);
   const updateSubtitleTranslation = useStore((state) => state.updateSubtitleTranslation);
   const retranslateSubtitle = useStore((state) => state.retranslateSubtitle);
@@ -110,6 +114,7 @@ export default function App() {
   const audioRef = useRef(null);
   const displaySubtitles = subtitles;
   const hasSubtitles = displaySubtitles.length > 0;
+  const activeDemoScenario = getDemoScenario(demoScenarioId);
   const workflowSteps = buildWorkflowSteps({
     sourceMode,
     fileMeta,
@@ -205,6 +210,13 @@ export default function App() {
     }
 
     startDemoStream();
+  };
+
+  const handleDemoScenarioChange = (scenario) => {
+    if (isRunning) return;
+    setSourceMode('demo');
+    setDemoScenarioId(scenario.id);
+    replaceGlossaryTerms(scenario.terms);
   };
 
   const startFileInterpretation = async () => {
@@ -462,7 +474,9 @@ export default function App() {
                   ? (fileMeta?.name ?? 'Upload an audio/video file')
                   : sourceMode === 'live'
                     ? (captureSourceLabel || 'Select a tab or screen')
-                    : 'Global AI Product Launch'}
+                    : sourceMode === 'demo'
+                      ? activeDemoScenario.title
+                      : 'Browser microphone input'}
               </strong>
               <span>
                 {sourceMode === 'file'
@@ -477,11 +491,26 @@ export default function App() {
               </span>
             </div>
             {sourceMode === 'demo' && (
-              <div className="mode-help-card">
-                <Sparkles size={16} />
-                <div>
-                  <strong>Ready without keys</strong>
-                  <span>点击下方按钮即可播放内置英文语音流，并流式生成中文字幕。</span>
+              <div className="demo-scenarios" aria-label="Demo scenario presets">
+                {demoScenarios.map((scenario) => (
+                  <button
+                    type="button"
+                    className={scenario.id === demoScenarioId ? 'active' : ''}
+                    disabled={isRunning}
+                    key={scenario.id}
+                    onClick={() => handleDemoScenarioChange(scenario)}
+                  >
+                    <span>{scenario.badge}</span>
+                    <strong>{scenario.label}</strong>
+                    <small>{scenario.summary}</small>
+                  </button>
+                ))}
+                <div className="mode-help-card">
+                  <Sparkles size={16} />
+                  <div>
+                    <strong>Ready without keys · {activeDemoScenario.transcript.length} captions</strong>
+                    <span>选择一个场景后点击开始，系统会播放内置英文语音流，并按该场景术语生成中文字幕。</span>
+                  </div>
                 </div>
               </div>
             )}

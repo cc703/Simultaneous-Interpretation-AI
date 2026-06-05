@@ -1,5 +1,5 @@
 import { useStore } from '../store/index.js';
-import { demoTranscript } from '../mock/demoTranscript.js';
+import { getDemoScenario } from '../mock/demoTranscript.js';
 import { enqueueTTS, speakOnce } from './tts.js';
 
 let timers = [];
@@ -9,14 +9,15 @@ export function startDemoStream({ speed = 0.45 } = {}) {
   stopDemoStream();
 
   const store = useStore.getState();
+  const transcript = getActiveTranscript();
   store.startTranslation();
   store.setSourceMode('demo');
 
-  demoTranscript.forEach((entry, index) => {
+  transcript.forEach((entry, index) => {
     const timer = window.setTimeout(() => {
       releaseDemoCaption(entry, {
         onDone: () => {
-          if (index === demoTranscript.length - 1) {
+          if (index === transcript.length - 1) {
             useStore.getState().stopTranslation();
           }
         },
@@ -37,7 +38,7 @@ export function stopDemoStream() {
 }
 
 export function getDemoTranscript() {
-  return demoTranscript;
+  return getActiveTranscript();
 }
 
 export function startFileDemoStream(audioElement) {
@@ -52,10 +53,11 @@ export function startFileDemoStream(audioElement) {
   store.setSourceMode('file');
 
   const emitted = new Set();
+  const transcript = getActiveTranscript();
   const releaseDueCaptions = () => {
     const currentMs = audioElement.currentTime * 1000;
 
-    demoTranscript.forEach((entry, index) => {
+    transcript.forEach((entry, index) => {
       if (emitted.has(index) || currentMs < entry.startMs) return;
       emitted.add(index);
       releaseDemoCaption(entry);
@@ -79,6 +81,11 @@ export function startFileDemoStream(audioElement) {
     audioElement.removeEventListener('timeupdate', releaseDueCaptions);
     audioElement.removeEventListener('ended', handleEnded);
   };
+}
+
+function getActiveTranscript() {
+  const scenarioId = useStore.getState().demoScenarioId;
+  return getDemoScenario(scenarioId).transcript;
 }
 
 function releaseDemoCaption(entry, { onDone } = {}) {
