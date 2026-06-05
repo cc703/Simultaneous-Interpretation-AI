@@ -1,6 +1,6 @@
 const baseUrls = [
   ['translation', readEnv('OPENAI_TRANSLATION_BASE_URL', readEnv('OPENAI_BASE_URL', 'https://api.openai.com/v1'))],
-  ['asr', readEnv('OPENAI_ASR_BASE_URL', 'https://api.openai.com/v1')],
+  ['asr', getAsrBaseUrl()],
 ];
 
 for (const [name, baseUrl] of baseUrls) {
@@ -23,9 +23,23 @@ for (const [name, baseUrl] of baseUrls) {
 
 function buildHeaders(name) {
   const apiKey = name === 'asr'
-    ? readEnv('OPENAI_ASR_API_KEY', readEnv('OPENAI_API_KEY', ''))
+    ? getAsrApiKey()
     : readEnv('OPENAI_TRANSLATION_API_KEY', readEnv('OPENAI_API_KEY', ''));
   return apiKey ? { Authorization: `Bearer ${apiKey}` } : {};
+}
+
+function getAsrBaseUrl() {
+  const provider = readEnv('ASR_PROVIDER', 'dashscope');
+  if (provider === 'dashscope') {
+    return readEnv('DASHSCOPE_ASR_BASE_URL', 'https://dashscope.aliyuncs.com/compatible-mode/v1');
+  }
+  return readEnv('OPENAI_ASR_BASE_URL', 'https://api.openai.com/v1');
+}
+
+function getAsrApiKey() {
+  const provider = readEnv('ASR_PROVIDER', 'dashscope');
+  if (provider === 'dashscope') return readEnv('DASHSCOPE_API_KEY', readEnv('OPENAI_ASR_API_KEY', readEnv('OPENAI_API_KEY', '')));
+  return readEnv('OPENAI_ASR_API_KEY', readEnv('OPENAI_API_KEY', ''));
 }
 
 function readEnv(name, fallback) {

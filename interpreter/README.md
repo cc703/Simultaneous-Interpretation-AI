@@ -39,16 +39,19 @@ npm run dev:server
 
 然后另开一个终端运行 `npm run dev`。Vite 会把 `/api/*` 转发到 `http://localhost:8787`。未启动后端时，Demo 模式仍可完整演示；填写浏览器内存 Key 时也可以继续走浏览器直连。
 
-如果使用第三方 OpenAI-compatible 网关，建议分开配置：
+如果使用第三方 OpenAI-compatible 网关，建议把翻译和 ASR 分开配置。默认 ASR Provider 使用国产阿里云百炼 DashScope Qwen-ASR：
 
 ```env
 OPENAI_TRANSLATION_BASE_URL=https://your-chat-compatible.example/v1
-OPENAI_ASR_BASE_URL=https://api.openai.com/v1
 OPENAI_TRANSLATION_API_KEY=你的聊天网关Key
-OPENAI_ASR_API_KEY=你的官方OpenAI或支持音频转写的Key
+
+ASR_PROVIDER=dashscope
+DASHSCOPE_API_KEY=你的阿里云百炼DashScope Key
+DASHSCOPE_ASR_BASE_URL=https://dashscope.aliyuncs.com/compatible-mode/v1
+DASHSCOPE_ASR_MODEL=qwen3-asr-flash
 ```
 
-很多第三方聊天网关只支持 `/chat/completions`，不支持 `/audio/transcriptions`。可用以下命令检查当前 `.env` 的接口可达性：
+很多第三方聊天网关只支持 `/chat/completions`，不支持语音转写。可用以下命令检查当前 `.env` 的接口可达性：
 
 ```bash
 npm run check:api
@@ -98,7 +101,7 @@ Chrome 或 Edge 中打开本地页面，点击输入源 `Mic`，再点击 `Start
 ## 文件模式验证
 
 1. 点击输入源 `File`，上传 `.mp3`、`.mp4`、`.wav`、`.m4a`、`.webm` 或 `.ogg` 文件。
-2. 在 `Configuration -> ASR` 填写 OpenAI ASR Key，或启动已配置 `OPENAI_API_KEY` 的本地后端代理；默认模型为 `gpt-4o-mini-transcribe`。
+2. 推荐启动已配置 `DASHSCOPE_API_KEY` 的本地后端代理；默认国产 ASR 模型为 `qwen3-asr-flash`。如需 OpenAI ASR，可把 `.env` 中 `ASR_PROVIDER` 改为 `openai`。
 3. 可使用 `test-media/sample-english-speech.wav` 作为英文语音测试文件，左侧会显示文件名、大小、格式和时长。
 4. 点击 `Start Interpreting` 后，系统会把文件发送到 `/audio/transcriptions` 做真实英文转写。
 5. 转写结果会按英文句子进入现有中文翻译、字幕修正、术语命中、TTS 和导出流程。
@@ -108,7 +111,7 @@ Chrome 或 Edge 中打开本地页面，点击输入源 `Mic`，再点击 `Start
 ## 直播模式验证
 
 1. 点击输入源 `Live`。
-2. 在 `Configuration -> ASR` 填写 OpenAI ASR Key，或启动已配置 `OPENAI_API_KEY` 的本地后端代理；Live 会复用同一套 `/audio/transcriptions` 配置。
+2. 推荐启动已配置 `DASHSCOPE_API_KEY` 的本地后端代理；Live 会复用同一套 `/api/transcribe` 配置。若使用 OpenAI ASR，可把 `.env` 中 `ASR_PROVIDER` 改为 `openai`。
 3. 点击 `Choose tab audio`，选择一个带英文音频的浏览器标签页或屏幕。
 4. 左侧会显示捕获来源名称，并可点击 `Stop live capture` 释放所有音频 track。
 5. 如果浏览器支持 MediaRecorder，系统会按设置的音频分片长度持续转写直播音频，并把转写文本送入翻译链路。
@@ -150,7 +153,7 @@ Chrome 或 Edge 中打开本地页面，点击输入源 `Mic`，再点击 `Start
 ## 计划功能
 
 - 麦克风英文语音实时识别与中文字幕输出：已完成浏览器 Web Speech API MVP。
-- 文件音频真实 ASR：已完成 OpenAI `/audio/transcriptions` 浏览器直传入口与 Node 后端代理入口，未配置 Key 时降级为稳定演示流。
+- 文件音频真实 ASR：已完成 DashScope Qwen-ASR 国产后端代理入口，并保留 OpenAI `/audio/transcriptions` 可选入口；未配置 Key 时降级为稳定演示流。
 - Demo 音频流：已完成英文语音模拟 + 中文流式字幕，用于无 Key 稳定演示。
 - AI 流式翻译：已完成 OpenAI-compatible SSE 引擎、Provider 配置与 `/api/translate` 服务端代理。
 - 人工修正字幕译文：已完成。

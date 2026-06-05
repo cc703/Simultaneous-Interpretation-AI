@@ -30,10 +30,27 @@ npm run dev:server
 npm run smoke:file-asr
 ```
 
-如果 `.env` 没有配置 `OPENAI_API_KEY`，期望输出：
+默认 ASR Provider 为阿里云百炼 DashScope Qwen-ASR。`.env` 示例：
+
+```env
+ASR_PROVIDER=dashscope
+DASHSCOPE_API_KEY=你的DashScopeKey
+DASHSCOPE_ASR_MODEL=qwen3-asr-flash
+```
+
+如果 `.env` 没有配置 `DASHSCOPE_API_KEY` 或其他 ASR Key，期望输出：
 
 ```text
 PASS missing_server_key: backend is reachable and correctly refuses ASR without OPENAI_API_KEY.
 ```
 
-如果 `.env` 已配置 `OPENAI_API_KEY`，脚本会把音频上传到 `/api/transcribe`，并要求上游返回非空英文转写文本。
+如果 `.env` 已配置可用的 `DASHSCOPE_API_KEY`，脚本会把音频上传到 `/api/transcribe`，通过 Qwen-ASR 返回非空英文转写文本。
+
+如需改用 OpenAI ASR：
+
+```env
+ASR_PROVIDER=openai
+OPENAI_ASR_BASE_URL=https://api.openai.com/v1
+OPENAI_ASR_API_KEY=你的OpenAIKey
+OPENAI_ASR_MODEL=gpt-4o-mini-transcribe
+```

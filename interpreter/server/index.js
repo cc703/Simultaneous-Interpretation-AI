@@ -9,6 +9,11 @@ const OPENAI_TRANSLATION_API_KEY = readEnv('OPENAI_TRANSLATION_API_KEY', OPENAI_
 const OPENAI_ASR_API_KEY = readEnv('OPENAI_ASR_API_KEY', OPENAI_API_KEY);
 const OPENAI_TRANSLATION_MODEL = readEnv('OPENAI_TRANSLATION_MODEL', 'gpt-4o-mini');
 const OPENAI_ASR_MODEL = readEnv('OPENAI_ASR_MODEL', 'gpt-4o-mini-transcribe');
+const ASR_PROVIDER = readEnv('ASR_PROVIDER', 'dashscope');
+const DASHSCOPE_API_KEY = readEnv('DASHSCOPE_API_KEY', OPENAI_ASR_API_KEY);
+const DASHSCOPE_ASR_BASE_URL = readEnv('DASHSCOPE_ASR_BASE_URL', 'https://dashscope.aliyuncs.com/compatible-mode/v1');
+const DASHSCOPE_ASR_MODEL = readEnv('DASHSCOPE_ASR_MODEL', 'qwen3-asr-flash');
+const DASHSCOPE_MAX_AUDIO_BYTES = 10 * 1024 * 1024;
 
 const server = http.createServer(async (request, response) => {
   try {
@@ -17,11 +22,12 @@ const server = http.createServer(async (request, response) => {
         ok: true,
         hasOpenAIKey: Boolean(OPENAI_TRANSLATION_API_KEY || OPENAI_ASR_API_KEY),
         hasTranslationKey: Boolean(OPENAI_TRANSLATION_API_KEY),
-        hasAsrKey: Boolean(OPENAI_ASR_API_KEY),
+        hasAsrKey: Boolean(getAsrApiKey()),
+        asrProvider: ASR_PROVIDER,
         translationModel: OPENAI_TRANSLATION_MODEL,
-        asrModel: OPENAI_ASR_MODEL,
+        asrModel: getAsrModel(),
         translationBaseUrl: redactBaseUrl(OPENAI_TRANSLATION_BASE_URL),
-        asrBaseUrl: redactBaseUrl(OPENAI_ASR_BASE_URL),
+        asrBaseUrl: redactBaseUrl(getAsrBaseUrl()),
       });
       return;
     }
@@ -103,7 +109,7 @@ async function proxyTranslation(request, response) {
 }
 
 async function proxyTranscription(request, response) {
-  if (!ensureApiKey(response, OPENAI_ASR_API_KEY, 'asr')) return;
+  if (!ensureApiKey(response, getAsrApiKey(), 'asr')) return;
   const body = await readRawBody(request);
   const contentType = request.headers['content-type'];
   if (!contentType?.includes('multipart/form-data')) {
@@ -111,6 +117,15 @@ async function proxyTranscription(request, response) {
     return;
   }
 
+  if (ASR_PROVIDER === 'dashscope') {
+    await proxyDashScopeTranscription({ body, contentType, response });
+    return;
+  }
+
+  await proxyOpenAITranscription({ body, contentType, response });
+}
+
+async function proxyOpenAITranscription({ body, contentType, response }) {
   let upstream;
   try {
     upstream = await fetch(`${OPENAI_ASR_BASE_URL.replace(/\/$/, '')}/audio/transcriptions`, {
@@ -146,6 +161,100 @@ async function proxyTranscription(request, response) {
   response.end(text);
 }
 
+async function proxyDashScopeTranscription({ body, contentType, response }) {
+  let parsed;
+  try {
+    parsed = parseMultipartFile(body, contentType);
+  } catch (error) {
+    sendJson(response, 400, { error: error.message, code: 'invalid_audio_upload' });
+    return;
+  }
+
+  if (parsed.file.length > DASHSCOPE_MAX_AUDIO_BYTES) {
+    sendJson(response, 413, {
+      error: 'DashScope Qwen-ASR inline audio limit is 10MB. Use a shorter sample or switch to an object-storage URL workflow.',
+      code: 'dashscope_audio_too_large',
+    });
+    return;
+  }
+
+  const dataUrl = `data:${parsed.contentType};base64,${parsed.file.toString('base64')}`;
+  let upstream;
+  try {
+    upstream = await fetch(`${DASHSCOPE_ASR_BASE_URL.replace(/\/$/, '')}/chat/completions`, {
+      method: 'POST',
+      headers: {
+        Authorization: `Bearer ${DASHSCOPE_API_KEY}`,
+        'Content-Type': 'application/json',
+      },
+      body: JSON.stringify({
+        model: DASHSCOPE_ASR_MODEL,
+        messages: [
+          {
+            role: 'user',
+            content: [
+              { type: 'input_audio', input_audio: { data: dataUrl } },
+              { type: 'text', text: '请将这段英文音频完整转写为英文文本，只输出转写内容。' },
+            ],
+          },
+        ],
+      }),
+    });
+  } catch (error) {
+    sendJson(response, 502, {
+      error: error.message || 'DashScope ASR upstream network error.',
+      code: 'asr_network_error',
+      upstreamBaseUrl: redactBaseUrl(DASHSCOPE_ASR_BASE_URL),
+    });
+    return;
+  }
+
+  const bodyText = await upstream.text();
+  if (!upstream.ok) {
+    sendJson(response, upstream.status, {
+      error: `DashScope ASR failed: ${bodyText}`,
+      code: 'asr_upstream_error',
+      upstreamStatus: upstream.status,
+      upstreamBaseUrl: redactBaseUrl(DASHSCOPE_ASR_BASE_URL),
+    });
+    return;
+  }
+
+  let payload;
+  try {
+    payload = JSON.parse(bodyText);
+  } catch {
+    sendJson(response, 502, {
+      error: `DashScope ASR returned non-JSON response: ${bodyText.slice(0, 240)}`,
+      code: 'asr_invalid_response',
+    });
+    return;
+  }
+
+  const text = payload.choices?.[0]?.message?.content?.trim();
+  if (!text) {
+    sendJson(response, 502, {
+      error: `DashScope ASR returned no text: ${bodyText.slice(0, 240)}`,
+      code: 'asr_empty_response',
+    });
+    return;
+  }
+
+  sendJson(response, 200, { text });
+}
+
+function getAsrApiKey() {
+  return ASR_PROVIDER === 'dashscope' ? DASHSCOPE_API_KEY : OPENAI_ASR_API_KEY;
+}
+
+function getAsrBaseUrl() {
+  return ASR_PROVIDER === 'dashscope' ? DASHSCOPE_ASR_BASE_URL : OPENAI_ASR_BASE_URL;
+}
+
+function getAsrModel() {
+  return ASR_PROVIDER === 'dashscope' ? DASHSCOPE_ASR_MODEL : OPENAI_ASR_MODEL;
+}
+
 function ensureApiKey(response, apiKey, purpose) {
   if (!apiKey) {
     sendJson(response, 503, {
@@ -165,6 +274,49 @@ function redactBaseUrl(value) {
   } catch {
     return 'invalid-url';
   }
+}
+
+function parseMultipartFile(body, contentType) {
+  const boundaryMatch = contentType.match(/boundary=([^;]+)/);
+  if (!boundaryMatch) throw new Error('Missing multipart boundary.');
+  const boundary = Buffer.from(`--${boundaryMatch[1].replace(/^"|"$/g, '')}`);
+  const parts = splitMultipart(body, boundary);
+
+  for (const part of parts) {
+    const separator = part.indexOf('\r\n\r\n');
+    if (separator === -1) continue;
+    const headerText = part.subarray(0, separator).toString('utf8');
+    if (!/name="file"/.test(headerText)) continue;
+    const contentTypeMatch = headerText.match(/Content-Type:\s*([^\r\n]+)/i);
+    let file = part.subarray(separator + 4);
+    if (file.subarray(-2).toString() === '\r\n') file = file.subarray(0, -2);
+    return {
+      file,
+      contentType: contentTypeMatch?.[1]?.trim() || 'application/octet-stream',
+    };
+  }
+
+  throw new Error('Missing file part in multipart upload.');
+}
+
+function splitMultipart(body, boundary) {
+  const parts = [];
+  let cursor = 0;
+
+  while (cursor < body.length) {
+    const start = body.indexOf(boundary, cursor);
+    if (start === -1) break;
+    const next = body.indexOf(boundary, start + boundary.length);
+    if (next === -1) break;
+    let partStart = start + boundary.length;
+    if (body.subarray(partStart, partStart + 2).toString() === '\r\n') partStart += 2;
+    let part = body.subarray(partStart, next);
+    if (part.subarray(-2).toString() === '\r\n') part = part.subarray(0, -2);
+    if (part.length > 0 && part.subarray(0, 2).toString() !== '--') parts.push(part);
+    cursor = next;
+  }
+
+  return parts;
 }
 
 async function readJson(request) {

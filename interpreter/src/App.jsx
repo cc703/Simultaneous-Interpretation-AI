@@ -790,7 +790,7 @@ export default function App() {
               </button>
             </div>
             <div className="toolbar-note">
-              Latency {latencyMs ? `${(latencyMs / 1000).toFixed(1)}s` : '1.8s'} · Context {contextWindow} · API {serverHealth.hasOpenAIKey ? 'server' : 'browser'}
+              Latency {latencyMs ? `${(latencyMs / 1000).toFixed(1)}s` : '1.8s'} · Context {contextWindow} · ASR {serverHealth.asrProvider ?? (serverHealth.hasOpenAIKey ? 'server' : 'browser')}
             </div>
           </div>
 
