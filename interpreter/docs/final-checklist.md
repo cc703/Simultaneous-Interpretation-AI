@@ -7,6 +7,7 @@
 - [ ] 执行 `cd interpreter && npm install`
 - [ ] 执行 `npm run dev`
 - [ ] 浏览器打开 `http://localhost:5173`
+- [ ] 执行 `npm test` 通过
 - [ ] 执行 `npm run build` 通过
 
 ## 核心演示链路

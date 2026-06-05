@@ -24,6 +24,15 @@ npm run dev
 
 开发服务器默认运行在 `http://localhost:5173`。
 
+验证命令：
+
+```bash
+npm test
+npm run build
+```
+
+`npm test` 使用 Node 原生测试覆盖质量诊断、修正记忆、SRT 和同传复盘报告生成。
+
 ## STT 验证
 
 Chrome 或 Edge 中打开本地页面，点击输入源 `Mic`，再点击 `Start Interpreting` 后授权麦克风。说英文时，当前识别中的英文会显示在字幕区；完整句 final 后会进入翻译管线。未填写 API Key 时会显示明确的占位提示，不会伪装成真实翻译成功。
