@@ -5,8 +5,10 @@ import {
   startDemoStream,
   startFileDemoStream,
   startSTTSession,
+  startSystemAudioCapture,
   stopDemoStream,
   stopSTTSession,
+  stopSystemAudioCapture,
 } from './engine/index.js';
 import { useStore } from './store/index.js';
 import { copyBilingual, exportSRT } from './utils/export.js';
@@ -16,12 +18,16 @@ export default function App() {
   const latencyMs = useStore((state) => state.latencyMs);
   const currentInterim = useStore((state) => state.currentInterim);
   const sourceMode = useStore((state) => state.sourceMode);
+  const captureStream = useStore((state) => state.captureStream);
+  const captureSourceLabel = useStore((state) => state.captureSourceLabel);
+  const isCapturing = useStore((state) => state.isCapturing);
   const subtitles = useStore((state) => state.subtitles);
   const glossary = useStore((state) => state.glossary);
   const correctionCount = useStore((state) => state.correctionCount);
   const selectedSubtitleId = useStore((state) => state.selectedSubtitleId);
   const setSourceMode = useStore((state) => state.setSourceMode);
   const setUploadedFile = useStore((state) => state.setUploadedFile);
+  const setCaptureStream = useStore((state) => state.setCaptureStream);
   const addGlossaryTerm = useStore((state) => state.addGlossaryTerm);
   const selectSubtitle = useStore((state) => state.selectSubtitle);
   const updateSubtitleTranslation = useStore((state) => state.updateSubtitleTranslation);
@@ -137,6 +143,25 @@ export default function App() {
     setFileProgress(audio.currentTime / audio.duration);
   };
 
+  const handleLiveCapture = async () => {
+    if (captureStream) {
+      stopSystemAudioCapture(captureStream);
+      setCaptureStream(null, '');
+      return;
+    }
+
+    setSourceMode('live');
+    const result = await startSystemAudioCapture({
+      onAudioStream: ({ audioStream, label }) => {
+        setCaptureStream(audioStream, label);
+      },
+      onError: (error) => {
+        console.warn('[live-capture] failed:', error);
+      },
+    });
+    setCaptureStream(result.audioStream, result.label);
+  };
+
   return (
     <div className="app-shell">
       <header className="topbar">
@@ -183,13 +208,27 @@ export default function App() {
               >
                 File
               </button>
-              <button type="button" onClick={() => setSourceMode('live')}>Live</button>
+              <button
+                type="button"
+                className={sourceMode === 'live' ? 'active' : ''}
+                onClick={() => setSourceMode('live')}
+              >
+                Live
+              </button>
             </div>
             <div className="source-card">
-              <strong>{sourceMode === 'file' ? (fileMeta?.name ?? 'Upload an audio/video file') : 'Global AI Product Launch'}</strong>
+              <strong>
+                {sourceMode === 'file'
+                  ? (fileMeta?.name ?? 'Upload an audio/video file')
+                  : sourceMode === 'live'
+                    ? (captureSourceLabel || 'Select a tab or screen')
+                    : 'Global AI Product Launch'}
+              </strong>
               <span>
                 {sourceMode === 'file'
                   ? 'File playback drives the same timestamped caption stream'
+                  : sourceMode === 'live'
+                    ? 'Captured system audio is ready for ASR adapter expansion'
                   : sourceMode === 'demo'
                   ? 'Stable review demo · captions stream by timeline'
                   : (isSTTSupported()
@@ -225,6 +264,18 @@ export default function App() {
                 </audio>
               )}
             </div>
+            {sourceMode === 'live' && (
+              <div className="live-capture-card">
+                <button type="button" onClick={handleLiveCapture}>
+                  {isCapturing ? 'Stop live capture' : 'Choose tab audio'}
+                </button>
+                <p>
+                  {isCapturing
+                    ? '已捕获直播音频。当前 MVP 展示捕获与释放能力，直接 ASR 识别预留给 ASR Adapter。'
+                    : '选择带英文音频的标签页或屏幕，浏览器会显示共享权限提示。'}
+                </p>
+              </div>
+            )}
           </section>
 
           <section className="panel-block">

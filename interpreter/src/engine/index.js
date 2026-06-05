@@ -17,3 +17,7 @@ export {
   startDemoStream,
   stopDemoStream,
 } from './demoStream.js';
+export {
+  startSystemAudioCapture,
+  stopSystemAudioCapture,
+} from './audioCapture.js';

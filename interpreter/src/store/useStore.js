@@ -29,6 +29,8 @@ export const useStore = create((set, get) => ({
   // 音频源
   sourceMode: 'demo',
   uploadedFile: null,
+  captureStream: null,
+  captureSourceLabel: '',
   isCapturing: false,
   demoEnabled: false,
 
@@ -69,6 +71,11 @@ export const useStore = create((set, get) => ({
     demoEnabled: sourceMode === 'demo',
   }),
   setUploadedFile: (uploadedFile) => set({ uploadedFile }),
+  setCaptureStream: (captureStream, captureSourceLabel = '') => set({
+    captureStream,
+    captureSourceLabel,
+    isCapturing: Boolean(captureStream),
+  }),
   setIsCapturing: (isCapturing) => set({ isCapturing }),
 
   setProvider: (provider) => set({ provider }),
@@ -227,6 +234,8 @@ export const useStore = create((set, get) => ({
 
   resetSession: () => set({
     uploadedFile: null,
+    captureStream: null,
+    captureSourceLabel: '',
     isCapturing: false,
     demoEnabled: false,
     isRunning: false,
