@@ -55,10 +55,11 @@ npm run dev
 ## 5. 展示 Live 稳定性设计
 
 1. 切到 `Live`。
-2. 点击 `Choose tab audio`。
-3. 选择带英文音频的标签页或屏幕。
-4. 讲解 Live 统计：`Queued`、`Done`、`Silent`、`Dup`。
-5. 说明系统会跳过过短/静音片段，并对重复转写做去重，避免字幕刷屏。
+2. 讲解 Live 路径：`Select live source -> Capture browser audio -> Chunk ASR -> Chinese captions -> Correction & export`。
+3. 点击 `Choose live audio`。
+4. 选择带英文音频的网页直播、社交平台直播、媒体直播或会议标签页，并确认共享音频。
+5. 如果未配置 ASR Key，讲解状态会停在 `Audio captured · ASR not configured`：系统已捕获直播音频和波形，但不会生成假字幕。
+6. 如果 ASR Key 可用，讲解 Live 统计：`Queued`、`Done`、`Silent`、`Dup`、`Latency`。系统会跳过过短/静音片段，并对重复转写做去重，避免字幕刷屏。
 
 ## 6. 导出
 
@@ -70,5 +71,6 @@ npm run dev
 
 - Demo 模式用于稳定证明完整产品闭环。
 - File / Live 真实 ASR 依赖后端 provider、Key、网络和供应商能力。
+- Live 面向真实网页/社交/媒体直播和线上会议；用户必须主动授权浏览器共享音频。
 - Live 是几秒级准实时分片，不承诺零延迟。
 - 当前前端单文件建议 25MB 内；DashScope inline 音频建议 10MB 内。

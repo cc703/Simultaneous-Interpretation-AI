@@ -5,7 +5,7 @@ let recorder = null;
 let chunkIndex = 0;
 let active = false;
 let processing = Promise.resolve();
-let stats = { queued: 0, processed: 0, skipped: 0, duplicates: 0 };
+let stats = { queued: 0, processed: 0, skipped: 0, duplicates: 0, lastLatencyMs: 0 };
 let lastTranscript = '';
 
 export function isLiveASRSupported() {
@@ -29,7 +29,7 @@ export function startLiveASR(stream, {
   recorder = new MediaRecorder(stream, mimeType ? { mimeType } : undefined);
   active = true;
   chunkIndex = 0;
-  stats = { queued: 0, processed: 0, skipped: 0, duplicates: 0 };
+  stats = { queued: 0, processed: 0, skipped: 0, duplicates: 0, lastLatencyMs: 0 };
   lastTranscript = '';
   useStore.getState().startTranslation();
   emitStats(onStats);
@@ -77,6 +77,7 @@ export function stopLiveASR() {
 
 async function processChunk(blob, { index, apiKey, baseUrl, model, onStatus, onStats }) {
   if (!active) return;
+  const startedAt = performance.now();
   onStatus?.(`正在转写直播片段 #${index}...`);
   useStore.getState().updateCurrentInterim({
     en: `Live chunk #${index}`,
@@ -100,6 +101,7 @@ async function processChunk(blob, { index, apiKey, baseUrl, model, onStatus, onS
     }
     lastTranscript = transcript;
     stats.processed += 1;
+    stats.lastLatencyMs = Math.round(performance.now() - startedAt);
     emitStats(onStats);
     onStatus?.(`直播片段 #${index} 已转写，正在翻译。`);
     await translateTranscriptText(transcript);

@@ -508,13 +508,91 @@ button {
   line-height: 1.5;
 }
 
+.live-workflow {
+  display: grid;
+  gap: 5px;
+}
+
+.live-workflow span {
+  overflow: hidden;
+  padding: 6px 8px;
+  border: 1px solid var(--border);
+  border-radius: 5px;
+  color: var(--muted);
+  background: #ffffff;
+  font: 750 10px/1 "JetBrains Mono", monospace;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.live-workflow span.done {
+  border-color: #b7d1c8;
+  color: var(--green);
+  background: #eef7f3;
+}
+
+.live-state-grid {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 6px;
+}
+
+.live-state-item {
+  min-width: 0;
+  display: grid;
+  gap: 4px;
+  padding: 8px;
+  border: 1px solid var(--border);
+  border-radius: 6px;
+  background: #ffffff;
+}
+
+.live-state-item span {
+  overflow: hidden;
+  color: var(--muted);
+  font: 750 10px/1 "JetBrains Mono", monospace;
+  text-overflow: ellipsis;
+  text-transform: uppercase;
+  white-space: nowrap;
+}
+
+.live-state-item strong {
+  overflow: hidden;
+  color: var(--text);
+  font-size: 12px;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.live-state-item.ok {
+  border-color: #b7d1c8;
+  background: #f7fbf8;
+}
+
+.live-state-item.warn {
+  border-color: #dcc2a7;
+  background: #fbf5ee;
+}
+
+.live-boundary {
+  padding: 8px 10px;
+  border: 1px dashed #dcc2a7;
+  border-radius: 6px;
+  color: var(--amber);
+  background: #fffaf3;
+  font-size: 12px;
+  line-height: 1.45;
+}
+
 .live-stats {
   display: grid;
-  grid-template-columns: repeat(4, minmax(0, 1fr));
+  grid-template-columns: repeat(5, minmax(0, 1fr));
   gap: 5px;
 }
 
 .live-stats span {
+  display: grid;
+  gap: 3px;
   overflow: hidden;
   padding: 5px 6px;
   border-radius: 5px;
@@ -524,6 +602,11 @@ button {
   text-align: center;
   text-overflow: ellipsis;
   white-space: nowrap;
+}
+
+.live-stats strong {
+  color: var(--text);
+  font-size: 11px;
 }
 
 .source-card strong,

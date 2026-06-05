@@ -114,11 +114,12 @@ Chrome 或 Edge 中打开本地页面，点击输入源 `Mic`，再点击 `Start
 ## 直播模式验证
 
 1. 点击输入源 `Live`。
-2. 推荐启动已配置 `DASHSCOPE_API_KEY` 的本地后端代理；Live 会复用同一套 `/api/transcribe` 配置。若使用 OpenAI ASR，可把 `.env` 中 `ASR_PROVIDER` 改为 `openai`。
-3. 点击 `Choose tab audio`，选择一个带英文音频的浏览器标签页或屏幕。
-4. 左侧会显示捕获来源名称，并可点击 `Stop live capture` 释放所有音频 track。
-5. 如果浏览器支持 MediaRecorder，系统会按设置的音频分片长度持续转写直播音频，并把转写文本送入翻译链路。
-6. 未填写浏览器 ASR Key 且后端没有配置 Key 时，Live 只展示捕获和波形，不会伪装为真实转写。
+2. Live 面向网页直播、社交平台直播、媒体直播和线上会议；产品路径为 `Select live source -> Capture browser audio -> Chunk ASR -> Chinese captions -> Correction & export`。
+3. 推荐启动已配置 `DASHSCOPE_API_KEY` 的本地后端代理；Live 会复用同一套 `/api/transcribe` 配置。若使用 OpenAI ASR，可把 `.env` 中 `ASR_PROVIDER` 改为 `openai`。
+4. 点击 `Choose live audio`，选择一个带英文音频的浏览器标签页或屏幕，并确认共享音频。
+5. 左侧会显示捕获来源、权限状态、ASR 配置状态、分片长度、字幕输出状态和 Live 统计。
+6. 如果浏览器支持 MediaRecorder，系统会按设置的音频分片长度持续转写直播音频，并把转写文本送入翻译链路。
+7. 未填写浏览器 ASR Key 且后端没有配置 Key 时，Live 只展示捕获、波形和配置缺口，不会伪装为真实转写。
 
 ## 设置面板验证
 

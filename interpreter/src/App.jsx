@@ -125,7 +125,8 @@ export default function App() {
   const [fileStage, setFileStage] = useState('idle');
   const [isSampleLoading, setIsSampleLoading] = useState(false);
   const [liveStatus, setLiveStatus] = useState('');
-  const [liveStats, setLiveStats] = useState({ queued: 0, processed: 0, skipped: 0, duplicates: 0 });
+  const [liveStage, setLiveStage] = useState('idle');
+  const [liveStats, setLiveStats] = useState({ queued: 0, processed: 0, skipped: 0, duplicates: 0, lastLatencyMs: 0 });
   const [serverHealth, setServerHealth] = useState({ ok: false, hasOpenAIKey: false });
   const [settingsOpen, setSettingsOpen] = useState(false);
   const [configTab, setConfigTab] = useState('translate');
@@ -134,6 +135,7 @@ export default function App() {
   const hasSubtitles = displaySubtitles.length > 0;
   const activeDemoScenario = getDemoScenario(demoScenarioId);
   const hasServerAsrKey = Boolean(serverHealth.ok && (serverHealth.hasAsrKey ?? serverHealth.hasOpenAIKey));
+  const hasLiveAsr = Boolean(asrApiKey.trim() || hasServerAsrKey);
   const workflowSteps = buildWorkflowSteps({
     sourceMode,
     fileMeta,
@@ -436,14 +438,16 @@ export default function App() {
       stopLiveASR();
       stopSystemAudioCapture(captureStream);
       setCaptureStream(null, '');
+      setLiveStage('paused');
       setLiveStatus('直播捕获已停止。');
-      setLiveStats({ queued: 0, processed: 0, skipped: 0, duplicates: 0 });
+      setLiveStats({ queued: 0, processed: 0, skipped: 0, duplicates: 0, lastLatencyMs: 0 });
       useStore.getState().stopTranslation();
       return;
     }
 
     setSourceMode('live');
-    setLiveStats({ queued: 0, processed: 0, skipped: 0, duplicates: 0 });
+    setLiveStage('requesting');
+    setLiveStats({ queued: 0, processed: 0, skipped: 0, duplicates: 0, lastLatencyMs: 0 });
     setLiveStatus('正在请求标签页或屏幕音频权限...');
     const result = await startSystemAudioCapture({
       onAudioStream: ({ audioStream, label }) => {
@@ -452,21 +456,25 @@ export default function App() {
       },
       onError: (error) => {
         console.warn('[live-capture] failed:', error);
+        setLiveStage('error');
         setLiveStatus(error.message || '直播捕获失败。');
       },
     });
     setCaptureStream(result.audioStream, result.label);
+    setLiveStage(hasLiveAsr ? 'asr-ready' : 'captured');
     startStreamAnalyser(result.audioStream);
     startLiveAsrIfReady(result.audioStream);
   };
 
   const startLiveAsrIfReady = (audioStream) => {
-    if (!asrApiKey.trim() && !serverHealth.hasOpenAIKey) {
-      setLiveStatus('已捕获直播音频。填写浏览器 ASR Key 或启动配置 OPENAI_API_KEY 的本地后端后可转写。');
+    if (!hasLiveAsr) {
+      setLiveStage('captured');
+      setLiveStatus('Audio captured · ASR not configured。已捕获直播音频，但未配置 ASR Key，不生成直播假字幕。');
       return;
     }
 
     try {
+      setLiveStage('running');
       startLiveASR(audioStream, {
         apiKey: asrApiKey,
         baseUrl: asrBaseUrl,
@@ -477,6 +485,7 @@ export default function App() {
       });
     } catch (error) {
       console.warn('[live-asr] start failed:', error);
+      setLiveStage('error');
       setLiveStatus(error.message || 'Live ASR 启动失败。');
     }
   };
@@ -677,22 +686,28 @@ export default function App() {
             )}
             {sourceMode === 'live' && (
               <div className="live-capture-card">
+                <LiveWorkflow stage={liveStage} hasSubtitles={hasSubtitles} />
                 <button type="button" onClick={handleLiveCapture}>
-                  {isCapturing ? 'Stop live capture' : 'Choose tab audio'}
+                  {getLivePrimaryAction({ isCapturing, liveStage, hasLiveAsr })}
                 </button>
-                <p>
-                  {isCapturing
-                    ? '已捕获直播音频。若已填写 ASR Key，系统会按设置的分片长度持续转写。'
-                    : '选择带英文音频的标签页或屏幕，浏览器会显示共享权限提示。'}
-                </p>
-                {isCapturing && (
-                  <div className="live-stats" aria-label="Live ASR queue statistics">
-                    <span>Queued {liveStats.queued}</span>
-                    <span>Done {liveStats.processed}</span>
-                    <span>Silent {liveStats.skipped}</span>
-                    <span>Dup {liveStats.duplicates}</span>
-                  </div>
-                )}
+                <p>适用于网页直播、社交平台直播、媒体直播和线上会议。用户需要在浏览器共享弹窗中选择标签页或屏幕，并共享音频。</p>
+                <div className="live-state-grid" aria-label="Live interpretation status">
+                  <LiveStateItem label="Source" value={captureSourceLabel || 'Not selected'} state={captureSourceLabel ? 'ok' : 'idle'} />
+                  <LiveStateItem label="Permission" value={isCapturing ? 'Audio captured' : liveStage === 'requesting' ? 'Requesting' : 'Required'} state={isCapturing ? 'ok' : liveStage === 'requesting' ? 'warn' : 'idle'} />
+                  <LiveStateItem label="ASR" value={hasLiveAsr ? 'Provider ready' : 'Not configured'} state={hasLiveAsr ? 'ok' : 'warn'} />
+                  <LiveStateItem label="Chunking" value={`${chunkSeconds}s chunks`} state="ok" />
+                  <LiveStateItem label="Output" value={hasSubtitles ? 'Captions ready' : 'Waiting'} state={hasSubtitles ? 'ok' : 'idle'} />
+                </div>
+                <div className="live-boundary">
+                  Live 是几秒级准实时分片；没有 ASR Key 时只展示捕获、波形和配置缺口，不生成直播假字幕。
+                </div>
+                <div className="live-stats" aria-label="Live ASR queue statistics">
+                  <span><strong>{liveStats.queued}</strong> Queued</span>
+                  <span><strong>{liveStats.processed}</strong> Done</span>
+                  <span><strong>{liveStats.skipped}</strong> Silent</span>
+                  <span><strong>{liveStats.duplicates}</strong> Dup</span>
+                  <span><strong>{liveStats.lastLatencyMs ? `${liveStats.lastLatencyMs}ms` : '-'}</strong> Latency</span>
+                </div>
                 {liveStatus && <div className="file-status">{liveStatus}</div>}
               </div>
             )}
@@ -770,7 +785,7 @@ export default function App() {
               <div className="config-body">
                 <div className="field-line compact">
                   <span>{asrModel}</span>
-                  <code>{asrApiKey ? 'browser key' : serverHealth.hasOpenAIKey ? 'server key' : 'key needed'}</code>
+                  <code>{asrApiKey ? 'browser key' : hasServerAsrKey ? 'server key' : 'key needed'}</code>
                 </div>
                 <select
                   className="settings-control"
@@ -1168,6 +1183,44 @@ function correctionLabel(type) {
   }[type] ?? '已修正';
 }
 
+function LiveWorkflow({ stage, hasSubtitles }) {
+  const activeIndex = {
+    idle: 0,
+    requesting: 0,
+    captured: 1,
+    'asr-ready': 2,
+    running: 2,
+    paused: hasSubtitles ? 4 : 1,
+    error: 0,
+  }[stage] ?? 0;
+  const steps = [
+    '1 Select live source',
+    '2 Capture browser audio',
+    '3 Chunk ASR',
+    '4 Chinese captions',
+    '5 Correction & export',
+  ];
+
+  return (
+    <div className="live-workflow" aria-label="Live interpretation workflow">
+      {steps.map((step, index) => (
+        <span className={index <= activeIndex || (index === 3 && hasSubtitles) || (index === 4 && hasSubtitles) ? 'done' : ''} key={step}>
+          {step}
+        </span>
+      ))}
+    </div>
+  );
+}
+
+function LiveStateItem({ label, value, state = 'idle' }) {
+  return (
+    <div className={`live-state-item ${state}`}>
+      <span>{label}</span>
+      <strong>{value}</strong>
+    </div>
+  );
+}
+
 function getWaveformLevel(waveformData, index) {
   if (!waveformData.length) return 24 + ((index * 19) % 52);
   const value = waveformData[index % waveformData.length] ?? 0;
@@ -1308,6 +1361,13 @@ function getRunButtonLabel({ isRunning, sourceMode, isCapturing }) {
   if (sourceMode === 'file') return 'Transcribe Uploaded File';
   if (sourceMode === 'live') return isCapturing ? 'Stop Live Capture' : 'Choose Live Audio';
   return 'Start Interpreting';
+}
+
+function getLivePrimaryAction({ isCapturing, liveStage, hasLiveAsr }) {
+  if (isCapturing && hasLiveAsr && liveStage === 'running') return 'Live ASR running';
+  if (isCapturing && !hasLiveAsr) return 'Audio captured · ASR not configured';
+  if (isCapturing) return 'Stop live capture';
+  return 'Choose live audio';
 }
 
 function shouldShowOriginal(subtitleMode, showOriginal) {
