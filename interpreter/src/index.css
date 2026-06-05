@@ -273,6 +273,10 @@ button {
   font-weight: 900;
 }
 
+.run-button:hover {
+  filter: brightness(1.08);
+}
+
 .right-panel {
   min-width: 0;
   min-height: calc(100vh - 57px);
@@ -357,6 +361,11 @@ button {
 .subtitle-card.glossary,
 .subtitle-card.auto {
   border-left-color: var(--amber);
+}
+
+.subtitle-card.interim {
+  border-left-color: var(--accent);
+  background: rgba(0, 212, 255, 0.06);
 }
 
 .subtitle-meta {

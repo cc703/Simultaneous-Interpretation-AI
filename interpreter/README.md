@@ -6,11 +6,11 @@
 
 ## 当前阶段
 
-PR-03：UI 框架与静态布局。
+PR-04：STT 引擎封装。
 
-当前已建立 Vite + React + Tailwind CSS 基础工程，并完成同传字幕工作台的静态界面。页面包含输入源选择、Provider 配置、术语表、字幕设置、mock 双语字幕、修正编辑器、底部大字幕和统计栏。
+当前已建立 Vite + React + Tailwind CSS 基础工程，完成同传字幕工作台的静态界面，并接入 Web Speech API STT 封装。页面包含输入源选择、Provider 配置、术语表、字幕设置、mock 双语字幕、修正编辑器、底部大字幕和统计栏。
 
-真实 STT、AI 翻译、修正持久化、导出和 Demo 流会按 `../design.md` 的 PR 顺序逐步实现。
+AI 翻译、修正持久化、导出和 Demo 流会按 `../design.md` 的 PR 顺序逐步实现。
 
 ## 快速开始
 
@@ -21,6 +21,10 @@ npm run dev
 ```
 
 开发服务器默认运行在 `http://localhost:5173`。
+
+## STT 验证
+
+Chrome 或 Edge 中打开本地页面，点击 `Start Interpreting` 后授权麦克风。说英文时，当前识别中的英文会显示在字幕区；完整句 final 后会生成一条字幕，中文位置暂显示“等待翻译引擎接入...”。真实中文翻译将在后续 PR-05 接入。
 
 ## 计划功能
 

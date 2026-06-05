@@ -1,7 +1,25 @@
 import { mockGlossary, mockSubtitles } from './mock/subtitles.js';
+import { isSTTSupported, startSTTSession, stopSTTSession } from './engine/index.js';
+import { useStore } from './store/index.js';
 
 export default function App() {
+  const isRunning = useStore((state) => state.isRunning);
+  const currentInterim = useStore((state) => state.currentInterim);
+  const liveSubtitles = useStore((state) => state.subtitles);
   const activeSubtitle = mockSubtitles.find((subtitle) => subtitle.isCurrent) ?? mockSubtitles.at(-1);
+  const displaySubtitles = liveSubtitles.length > 0 ? liveSubtitles : mockSubtitles;
+  const latestSubtitle = displaySubtitles.find((subtitle) => subtitle.isCurrent)
+    ?? displaySubtitles.at(-1)
+    ?? activeSubtitle;
+
+  const handleRunClick = () => {
+    if (isRunning) {
+      stopSTTSession();
+      return;
+    }
+
+    startSTTSession();
+  };
 
   return (
     <div className="app-shell">
@@ -15,7 +33,7 @@ export default function App() {
         </div>
         <div className="status-pill">
           <span />
-          Demo stream active
+          {isRunning ? 'Mic stream active' : 'Demo stream active'}
         </div>
         <div className="top-actions" aria-label="Header actions">
           <button type="button">Export</button>
@@ -35,7 +53,11 @@ export default function App() {
             </div>
             <div className="source-card">
               <strong>Global AI Product Launch</strong>
-              <span>Built-in review script · 00:42 elapsed</span>
+              <span>
+                {isSTTSupported()
+                  ? 'Mic STT available · Demo fallback ready'
+                  : 'Web Speech unavailable · Demo fallback ready'}
+              </span>
             </div>
           </section>
 
@@ -76,7 +98,9 @@ export default function App() {
             </label>
           </section>
 
-          <button className="run-button" type="button">Start Interpreting</button>
+          <button className="run-button" type="button" onClick={handleRunClick}>
+            {isRunning ? 'Stop Interpreting' : 'Start Interpreting'}
+          </button>
         </aside>
 
         <section className="right-panel" aria-label="Subtitle workspace">
@@ -101,7 +125,17 @@ export default function App() {
           <div className="progress-track"><span /></div>
 
           <div className="subtitle-scroll">
-            {mockSubtitles.map((subtitle) => (
+            {currentInterim.en && (
+              <article className="subtitle-card interim">
+                <div className="subtitle-meta">
+                  <time>live</time>
+                  <span>识别中</span>
+                </div>
+                <p className="source-text">{currentInterim.en}</p>
+                <p className="translated-text">{currentInterim.zh || '等待最终识别...'}</p>
+              </article>
+            )}
+            {displaySubtitles.map((subtitle) => (
               <article className={`subtitle-card ${subtitle.correctionType ?? ''}`} key={subtitle.id}>
                 <div className="subtitle-meta">
                   <time>{subtitle.timeLabel}</time>
@@ -123,20 +157,20 @@ export default function App() {
           <div className="correction-editor">
             <div>
               <h2>Correction Desk</h2>
-              <p>{activeSubtitle.en}</p>
+              <p>{latestSubtitle.en}</p>
             </div>
-            <div className="editor-preview">{activeSubtitle.zh}</div>
+            <div className="editor-preview">{latestSubtitle.zh}</div>
             <button type="button">Save correction</button>
             <button type="button">Retranslate with glossary</button>
           </div>
 
           <div className="subtitle-banner">
             <span>Current Chinese Subtitle</span>
-            <strong>{activeSubtitle.zh}</strong>
+            <strong>{currentInterim.zh || latestSubtitle.zh}</strong>
           </div>
 
           <footer className="stats-bar">
-            <span>Translated 5</span>
+            <span>Translated {displaySubtitles.length}</span>
             <span>Corrections 3</span>
             <span>Glossary 3</span>
             <span>Provider DeepSeek</span>
