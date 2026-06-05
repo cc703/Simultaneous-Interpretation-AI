@@ -130,6 +130,12 @@ button {
   color: var(--muted);
 }
 
+.top-actions button:disabled,
+.correction-editor button:disabled {
+  cursor: not-allowed;
+  opacity: 0.45;
+}
+
 .workspace {
   flex: 1;
   min-height: 0;

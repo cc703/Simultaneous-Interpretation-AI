@@ -1,5 +1,5 @@
 import { useEffect, useMemo, useRef, useState } from 'react';
-import { mockGlossary, mockSubtitles } from './mock/subtitles.js';
+import { mockGlossary } from './mock/subtitles.js';
 import {
   isSTTSupported,
   startDemoStream,
@@ -70,12 +70,20 @@ export default function App() {
   const [fileProgress, setFileProgress] = useState(0);
   const [settingsOpen, setSettingsOpen] = useState(false);
   const audioRef = useRef(null);
-  const displaySubtitles = subtitles.length > 0 ? subtitles : mockSubtitles;
+  const displaySubtitles = subtitles;
+  const hasSubtitles = displaySubtitles.length > 0;
   const selectedSubtitle = useMemo(() => (
     displaySubtitles.find((subtitle) => subtitle.id === selectedSubtitleId)
       ?? displaySubtitles.find((subtitle) => subtitle.isCurrent)
       ?? displaySubtitles.at(-1)
+      ?? {
+        id: 'empty',
+        en: 'No subtitle selected yet.',
+        zh: '点击 Start Interpreting 后，字幕会按时间逐句出现。',
+        termsApplied: [],
+      }
   ), [displaySubtitles, selectedSubtitleId]);
+  const hasSelectedSubtitle = selectedSubtitle.id !== 'empty';
 
   useEffect(() => {
     if (glossary.length === 0) {
@@ -133,7 +141,7 @@ export default function App() {
   };
 
   const handleSaveCorrection = () => {
-    if (!selectedSubtitle || !draftZh.trim()) return;
+    if (!hasSelectedSubtitle || !draftZh.trim()) return;
     updateSubtitleTranslation(
       selectedSubtitle.id,
       draftZh.trim(),
@@ -154,10 +162,12 @@ export default function App() {
   };
 
   const handleExport = () => {
+    if (!hasSubtitles) return;
     exportSRT(displaySubtitles);
   };
 
   const handleCopy = async () => {
+    if (!hasSubtitles) return;
     await copyBilingual(displaySubtitles);
   };
 
@@ -229,8 +239,8 @@ export default function App() {
         </div>
         <div className="top-actions" aria-label="Header actions">
           <button type="button" onClick={() => setSettingsOpen(true)}>Settings</button>
-          <button type="button" onClick={handleExport}>Export</button>
-          <button type="button" onClick={handleCopy}>Copy</button>
+          <button type="button" disabled={!hasSubtitles} onClick={handleExport}>Export</button>
+          <button type="button" disabled={!hasSubtitles} onClick={handleCopy}>Copy</button>
         </div>
       </header>
 
@@ -500,8 +510,12 @@ export default function App() {
               value={draftZh}
               onChange={(event) => setDraftZh(event.target.value)}
             />
-            <button type="button" onClick={handleSaveCorrection}>Save correction</button>
-            <button type="button" onClick={() => retranslateSubtitle(selectedSubtitle.id)}>
+            <button type="button" disabled={!hasSelectedSubtitle} onClick={handleSaveCorrection}>Save correction</button>
+            <button
+              type="button"
+              disabled={!hasSelectedSubtitle}
+              onClick={() => retranslateSubtitle(selectedSubtitle.id)}
+            >
               Retranslate with glossary
             </button>
           </div>
