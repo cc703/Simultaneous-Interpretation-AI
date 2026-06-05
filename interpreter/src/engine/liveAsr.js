@@ -5,6 +5,8 @@ let recorder = null;
 let chunkIndex = 0;
 let active = false;
 let processing = Promise.resolve();
+let stats = { queued: 0, processed: 0, skipped: 0, duplicates: 0 };
+let lastTranscript = '';
 
 export function isLiveASRSupported() {
   return typeof window !== 'undefined' && 'MediaRecorder' in window;
@@ -16,6 +18,7 @@ export function startLiveASR(stream, {
   model,
   chunkMs = 4000,
   onStatus,
+  onStats,
 } = {}) {
   stopLiveASR();
 
@@ -26,18 +29,30 @@ export function startLiveASR(stream, {
   recorder = new MediaRecorder(stream, mimeType ? { mimeType } : undefined);
   active = true;
   chunkIndex = 0;
+  stats = { queued: 0, processed: 0, skipped: 0, duplicates: 0 };
+  lastTranscript = '';
   useStore.getState().startTranslation();
+  emitStats(onStats);
   onStatus?.('Live ASR 已启动，正在按音频片段转写。');
 
   recorder.ondataavailable = (event) => {
-    if (!active || !event.data || event.data.size < 800) return;
+    if (!active || !event.data) return;
     const index = ++chunkIndex;
+    if (event.data.size < 1200) {
+      stats.skipped += 1;
+      emitStats(onStats);
+      onStatus?.(`直播片段 #${index} 过短或静音，已跳过。`);
+      return;
+    }
+    stats.queued += 1;
+    emitStats(onStats);
     processing = processing.then(() => processChunk(event.data, {
       index,
       apiKey,
       baseUrl,
       model,
       onStatus,
+      onStats,
     }));
   };
 
@@ -60,7 +75,7 @@ export function stopLiveASR() {
   recorder = null;
 }
 
-async function processChunk(blob, { index, apiKey, baseUrl, model, onStatus }) {
+async function processChunk(blob, { index, apiKey, baseUrl, model, onStatus, onStats }) {
   if (!active) return;
   onStatus?.(`正在转写直播片段 #${index}...`);
   useStore.getState().updateCurrentInterim({
@@ -77,6 +92,15 @@ async function processChunk(blob, { index, apiKey, baseUrl, model, onStatus }) {
       model,
     });
     if (!transcript.trim()) return;
+    if (isDuplicateTranscript(transcript, lastTranscript)) {
+      stats.duplicates += 1;
+      emitStats(onStats);
+      onStatus?.(`直播片段 #${index} 与上一片段重复，已跳过。`);
+      return;
+    }
+    lastTranscript = transcript;
+    stats.processed += 1;
+    emitStats(onStats);
     onStatus?.(`直播片段 #${index} 已转写，正在翻译。`);
     await translateTranscriptText(transcript);
   } catch (error) {
@@ -96,4 +120,27 @@ function pickMimeType() {
     'audio/mp4',
   ];
   return candidates.find((type) => MediaRecorder.isTypeSupported(type)) ?? '';
+}
+
+function emitStats(onStats) {
+  onStats?.({ ...stats });
+}
+
+function isDuplicateTranscript(current, previous) {
+  if (!current || !previous) return false;
+  const normalizedCurrent = normalizeTranscript(current);
+  const normalizedPrevious = normalizeTranscript(previous);
+  if (!normalizedCurrent || !normalizedPrevious) return false;
+  if (normalizedCurrent === normalizedPrevious) return true;
+  const shorter = normalizedCurrent.length < normalizedPrevious.length ? normalizedCurrent : normalizedPrevious;
+  const longer = normalizedCurrent.length >= normalizedPrevious.length ? normalizedCurrent : normalizedPrevious;
+  return shorter.length > 20 && longer.includes(shorter);
+}
+
+function normalizeTranscript(text) {
+  return text
+    .toLowerCase()
+    .replace(/[^\p{L}\p{N}]+/gu, ' ')
+    .replace(/\s+/g, ' ')
+    .trim();
 }

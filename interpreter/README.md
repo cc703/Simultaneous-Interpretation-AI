@@ -16,6 +16,8 @@ Demo 视频：待录制，提交前替换为公开可访问链接。
 
 录屏讲解脚本见 `docs/demo-script.md`。
 
+最终演示路径见 `docs/final-demo-path.md`。
+
 视觉系统与页面层级设计见 `docs/visual-system.md`。
 
 ## 快速开始

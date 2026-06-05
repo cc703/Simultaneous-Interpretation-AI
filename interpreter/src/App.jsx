@@ -109,7 +109,9 @@ export default function App() {
   const [fileMeta, setFileMeta] = useState(null);
   const [fileProgress, setFileProgress] = useState(0);
   const [fileStatus, setFileStatus] = useState('');
+  const [fileStage, setFileStage] = useState('idle');
   const [liveStatus, setLiveStatus] = useState('');
+  const [liveStats, setLiveStats] = useState({ queued: 0, processed: 0, skipped: 0, duplicates: 0 });
   const [serverHealth, setServerHealth] = useState({ ok: false, hasOpenAIKey: false });
   const [settingsOpen, setSettingsOpen] = useState(false);
   const [configTab, setConfigTab] = useState('translate');
@@ -242,12 +244,14 @@ export default function App() {
     const file = useStore.getState().uploadedFile;
     if (!file) {
       setFileStatus('请先上传一个音频或视频文件。');
+      setFileStage('error');
       return;
     }
 
     const hasServerAsr = serverHealth.ok && serverHealth.hasOpenAIKey;
     if (!asrApiKey.trim() && !hasServerAsr) {
       setFileStatus('未填写浏览器 ASR Key，后端也未配置 OPENAI_API_KEY，已降级为演示转写流。');
+      setFileStage('fallback');
       startFileDemoStream(audioRef.current);
       return;
     }
@@ -255,6 +259,7 @@ export default function App() {
     const audio = audioRef.current;
     audio?.play().catch((error) => console.warn('[file] preview playback failed:', error));
     useStore.getState().startTranslation();
+    setFileStage('asr');
     setFileStatus(hasServerAsr && !asrApiKey.trim()
       ? '正在通过本地后端代理调用真实 ASR...'
       : '正在调用真实 ASR 转写文件音频...');
@@ -270,11 +275,14 @@ export default function App() {
         baseUrl: asrBaseUrl,
         model: asrModel,
       });
+      setFileStage('translate');
       setFileStatus('真实 ASR 转写完成，正在进入中文同传翻译。');
       await translateTranscriptText(transcript);
+      setFileStage('done');
       setFileStatus('文件真实 ASR 与翻译流程完成。');
     } catch (error) {
       console.warn('[file-asr] failed:', error);
+      setFileStage('error');
       setFileStatus(error.message || '真实 ASR 失败，请检查 Key、模型或网络。');
       useStore.getState().updateCurrentInterim({
         en: file.name,
@@ -344,6 +352,7 @@ export default function App() {
     });
     setFileProgress(0);
     setFileStatus('');
+    setFileStage('ready');
     setSourceMode('file');
   };
 
@@ -366,11 +375,13 @@ export default function App() {
       stopSystemAudioCapture(captureStream);
       setCaptureStream(null, '');
       setLiveStatus('直播捕获已停止。');
+      setLiveStats({ queued: 0, processed: 0, skipped: 0, duplicates: 0 });
       useStore.getState().stopTranslation();
       return;
     }
 
     setSourceMode('live');
+    setLiveStats({ queued: 0, processed: 0, skipped: 0, duplicates: 0 });
     setLiveStatus('正在请求标签页或屏幕音频权限...');
     const result = await startSystemAudioCapture({
       onAudioStream: ({ audioStream, label }) => {
@@ -400,6 +411,7 @@ export default function App() {
         model: asrModel,
         chunkMs: chunkSeconds * 1000,
         onStatus: setLiveStatus,
+        onStats: setLiveStats,
       });
     } catch (error) {
       console.warn('[live-asr] start failed:', error);
@@ -562,7 +574,23 @@ export default function App() {
                     <span>{fileMeta.type}</span>
                   </div>
                 )}
+                {fileMeta && (
+                  <StageRail
+                    activeStage={fileStage}
+                    stages={[
+                      ['ready', 'File'],
+                      ['asr', 'ASR'],
+                      ['translate', 'Translate'],
+                      ['done', 'Done'],
+                    ]}
+                  />
+                )}
                 {fileStatus && <div className="file-status">{fileStatus}</div>}
+                {fileStage === 'error' && fileMeta && (
+                  <button className="retry-button" type="button" onClick={startFileInterpretation}>
+                    Retry file ASR
+                  </button>
+                )}
                 {fileUrl && (
                   <audio
                     ref={audioRef}
@@ -586,6 +614,14 @@ export default function App() {
                     ? '已捕获直播音频。若已填写 ASR Key，系统会按设置的分片长度持续转写。'
                     : '选择带英文音频的标签页或屏幕，浏览器会显示共享权限提示。'}
                 </p>
+                {isCapturing && (
+                  <div className="live-stats" aria-label="Live ASR queue statistics">
+                    <span>Queued {liveStats.queued}</span>
+                    <span>Done {liveStats.processed}</span>
+                    <span>Silent {liveStats.skipped}</span>
+                    <span>Dup {liveStats.duplicates}</span>
+                  </div>
+                )}
                 {liveStatus && <div className="file-status">{liveStatus}</div>}
               </div>
             )}
@@ -1094,6 +1130,21 @@ function SubtitleCard({ subtitle, analysis, isSelected, onSelect, showOriginal, 
         </div>
       )}
     </article>
+  );
+}
+
+function StageRail({ activeStage, stages }) {
+  const activeIndex = Math.max(0, stages.findIndex(([id]) => id === activeStage));
+  const isError = activeStage === 'error';
+
+  return (
+    <div className={`stage-rail ${isError ? 'error' : ''}`} aria-label="File processing stages">
+      {stages.map(([id, label], index) => (
+        <span className={index <= activeIndex && !isError ? 'done' : ''} key={id}>
+          {label}
+        </span>
+      ))}
+    </div>
   );
 }
 
