@@ -71,6 +71,7 @@ export const useStore = create((set, get) => ({
   // 字幕数据
   subtitles: [],
   currentInterim: { en: '', zh: '' },
+  waveformData: [],
 
   // 翻译修正能力
   glossary: [],
@@ -176,6 +177,7 @@ export const useStore = create((set, get) => ({
       ...nextInterim,
     },
   })),
+  setWaveformData: (waveformData) => set({ waveformData }),
 
   correctLastSubtitle: (newZh, type = 'auto', reason = '上下文自动修正') => {
     const last = [...get().subtitles].reverse().find((subtitle) => subtitle.zh);
@@ -305,6 +307,7 @@ export const useStore = create((set, get) => ({
     latencyMs: 0,
     subtitles: [],
     currentInterim: { en: '', zh: '' },
+    waveformData: [],
     correctionHistory: [],
     selectedSubtitleId: null,
     totalSentences: 0,

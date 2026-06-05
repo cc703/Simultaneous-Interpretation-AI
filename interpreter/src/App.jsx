@@ -3,9 +3,12 @@ import { mockGlossary, mockSubtitles } from './mock/subtitles.js';
 import {
   isSTTSupported,
   startDemoStream,
+  startElementAnalyser,
   startFileDemoStream,
+  startStreamAnalyser,
   startSTTSession,
   startSystemAudioCapture,
+  stopAudioAnalyser,
   stopDemoStream,
   stopSTTSession,
   stopSystemAudioCapture,
@@ -17,6 +20,7 @@ export default function App() {
   const isRunning = useStore((state) => state.isRunning);
   const latencyMs = useStore((state) => state.latencyMs);
   const currentInterim = useStore((state) => state.currentInterim);
+  const waveformData = useStore((state) => state.waveformData);
   const sourceMode = useStore((state) => state.sourceMode);
   const provider = useStore((state) => state.provider);
   const apiKey = useStore((state) => state.apiKey);
@@ -81,8 +85,10 @@ export default function App() {
     if (isRunning) {
       if (sourceMode === 'demo' || sourceMode === 'file') {
         stopDemoStream();
+        stopAudioAnalyser();
         useStore.getState().stopTranslation();
       } else {
+        stopAudioAnalyser();
         stopSTTSession();
       }
       return;
@@ -94,6 +100,7 @@ export default function App() {
     }
 
     if (sourceMode === 'file') {
+      startElementAnalyser(audioRef.current);
       startFileDemoStream(audioRef.current);
       return;
     }
@@ -162,6 +169,7 @@ export default function App() {
 
   const handleLiveCapture = async () => {
     if (captureStream) {
+      stopAudioAnalyser();
       stopSystemAudioCapture(captureStream);
       setCaptureStream(null, '');
       return;
@@ -171,12 +179,14 @@ export default function App() {
     const result = await startSystemAudioCapture({
       onAudioStream: ({ audioStream, label }) => {
         setCaptureStream(audioStream, label);
+        startStreamAnalyser(audioStream);
       },
       onError: (error) => {
         console.warn('[live-capture] failed:', error);
       },
     });
     setCaptureStream(result.audioStream, result.label);
+    startStreamAnalyser(result.audioStream);
   };
 
   return (
@@ -397,7 +407,7 @@ export default function App() {
               <span
                 // eslint-disable-next-line react/no-array-index-key
                 key={index}
-                style={{ '--level': `${24 + ((index * 19) % 52)}%` }}
+                style={{ '--level': `${getWaveformLevel(waveformData, index)}%` }}
               />
             ))}
           </div>
@@ -562,4 +572,10 @@ function correctionLabel(type) {
     glossary: '术语命中',
     auto: '上下文修正',
   }[type] ?? '已修正';
+}
+
+function getWaveformLevel(waveformData, index) {
+  if (!waveformData.length) return 24 + ((index * 19) % 52);
+  const value = waveformData[index % waveformData.length] ?? 0;
+  return Math.max(8, Math.round((value / 255) * 70));
 }

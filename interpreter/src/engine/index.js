@@ -21,3 +21,8 @@ export {
   startSystemAudioCapture,
   stopSystemAudioCapture,
 } from './audioCapture.js';
+export {
+  startElementAnalyser,
+  startStreamAnalyser,
+  stopAudioAnalyser,
+} from './audioAnalyser.js';
