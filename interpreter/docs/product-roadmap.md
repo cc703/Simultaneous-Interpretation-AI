@@ -7,7 +7,7 @@
 - Demo：无 Key 稳定展示外语输入、中文字幕、修正、术语重译、TTS 和导出。
 - Mic：浏览器 Web Speech API 识别麦克风英文。
 - File：可调用 OpenAI `/audio/transcriptions` 做真实文件 ASR，再进入翻译链路。
-- Live：可捕获标签页/屏幕音频并展示波形，真实直播 ASR 仍待切片接入。
+- Live：可捕获标签页/屏幕音频并展示波形；填写 ASR Key 后可用 MediaRecorder 分片送入真实 ASR。
 
 ## 下一步优先级
 
@@ -19,9 +19,10 @@
 
 ### P1：真实能力补齐
 
-- Live 模式接入 MediaRecorder 分片。
-- 每 4 秒把直播音频片段发送到 ASR Adapter。
-- 转写结果进入现有翻译、修正、导出流程。
+- Live 模式接入 MediaRecorder 分片。已完成。
+- 每 4 秒把直播音频片段发送到 ASR Adapter。已完成，可通过设置里的音频分片长度调整。
+- 转写结果进入现有翻译、修正、导出流程。已完成。
+- 下一步优化：静音片段过滤、重复转写去重、分片延迟统计。
 
 ### P2：翻译修正做成特色
 

@@ -37,3 +37,8 @@ export {
   transcribeAudioFile,
   translateTranscriptText,
 } from './asrAdapter.js';
+export {
+  isLiveASRSupported,
+  startLiveASR,
+  stopLiveASR,
+} from './liveAsr.js';

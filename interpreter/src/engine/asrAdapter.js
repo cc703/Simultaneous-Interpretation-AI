@@ -12,13 +12,32 @@ export async function transcribeAudioFile({
   language = 'en',
 }) {
   if (!file) throw new Error('请选择音频或视频文件。');
+  return transcribeAudioBlob({
+    blob: file,
+    filename: file.name || 'audio.webm',
+    apiKey,
+    baseUrl,
+    model,
+    language,
+  });
+}
+
+export async function transcribeAudioBlob({
+  blob,
+  filename = 'audio.webm',
+  apiKey,
+  baseUrl = 'https://api.openai.com/v1',
+  model = 'gpt-4o-mini-transcribe',
+  language = 'en',
+}) {
+  if (!blob) throw new Error('缺少可转写的音频片段。');
   if (!apiKey) throw new Error('请先填写 OpenAI ASR API Key。');
-  if (file.size > MAX_BROWSER_UPLOAD_BYTES) {
+  if (blob.size > MAX_BROWSER_UPLOAD_BYTES) {
     throw new Error('当前浏览器直传限制为 25MB，请换更短的音频或接入后端分片。');
   }
 
   const form = new FormData();
-  form.append('file', file);
+  form.append('file', blob, filename);
   form.append('model', model);
   form.append('language', language);
   form.append('response_format', 'json');

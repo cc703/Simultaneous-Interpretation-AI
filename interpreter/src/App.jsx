@@ -20,8 +20,10 @@ import {
   startStreamAnalyser,
   startSTTSession,
   startSystemAudioCapture,
+  startLiveASR,
   stopAudioAnalyser,
   stopDemoStream,
+  stopLiveASR,
   stopSTTSession,
   transcribeAudioFile,
   translateTranscriptText,
@@ -89,6 +91,7 @@ export default function App() {
   const [fileMeta, setFileMeta] = useState(null);
   const [fileProgress, setFileProgress] = useState(0);
   const [fileStatus, setFileStatus] = useState('');
+  const [liveStatus, setLiveStatus] = useState('');
   const [settingsOpen, setSettingsOpen] = useState(false);
   const audioRef = useRef(null);
   const displaySubtitles = subtitles;
@@ -162,6 +165,7 @@ export default function App() {
       } else {
         stopAudioAnalyser();
         cancelTTS();
+        stopLiveASR();
         stopSTTSession();
       }
       return;
@@ -290,12 +294,16 @@ export default function App() {
   const handleLiveCapture = async () => {
     if (captureStream) {
       stopAudioAnalyser();
+      stopLiveASR();
       stopSystemAudioCapture(captureStream);
       setCaptureStream(null, '');
+      setLiveStatus('直播捕获已停止。');
+      useStore.getState().stopTranslation();
       return;
     }
 
     setSourceMode('live');
+    setLiveStatus('正在请求标签页或屏幕音频权限...');
     const result = await startSystemAudioCapture({
       onAudioStream: ({ audioStream, label }) => {
         setCaptureStream(audioStream, label);
@@ -303,10 +311,32 @@ export default function App() {
       },
       onError: (error) => {
         console.warn('[live-capture] failed:', error);
+        setLiveStatus(error.message || '直播捕获失败。');
       },
     });
     setCaptureStream(result.audioStream, result.label);
     startStreamAnalyser(result.audioStream);
+    startLiveAsrIfReady(result.audioStream);
+  };
+
+  const startLiveAsrIfReady = (audioStream) => {
+    if (!asrApiKey.trim()) {
+      setLiveStatus('已捕获直播音频。填写 File ASR Key 后可启动真实直播转写。');
+      return;
+    }
+
+    try {
+      startLiveASR(audioStream, {
+        apiKey: asrApiKey,
+        baseUrl: asrBaseUrl,
+        model: asrModel,
+        chunkMs: chunkSeconds * 1000,
+        onStatus: setLiveStatus,
+      });
+    } catch (error) {
+      console.warn('[live-asr] start failed:', error);
+      setLiveStatus(error.message || 'Live ASR 启动失败。');
+    }
   };
 
   return (
@@ -401,7 +431,7 @@ export default function App() {
                 {sourceMode === 'file'
                   ? (asrApiKey ? 'Real file ASR enabled · audio transcriptions API' : 'Add ASR key for real file transcription')
                   : sourceMode === 'live'
-                    ? 'Captured system audio is ready for ASR adapter expansion'
+                    ? (asrApiKey ? 'Live ASR chunks enabled · MediaRecorder' : 'Capture audio first · add ASR key for real transcription')
                   : sourceMode === 'demo'
                   ? 'Built-in English voice + streaming Chinese captions'
                   : (isSTTSupported()
@@ -445,9 +475,10 @@ export default function App() {
                 </button>
                 <p>
                   {isCapturing
-                    ? '已捕获直播音频。当前 MVP 展示捕获与释放能力，直接 ASR 识别预留给 ASR Adapter。'
+                    ? '已捕获直播音频。若已填写 ASR Key，系统会按设置的分片长度持续转写。'
                     : '选择带英文音频的标签页或屏幕，浏览器会显示共享权限提示。'}
                 </p>
+                {liveStatus && <div className="file-status">{liveStatus}</div>}
               </div>
             )}
           </section>
@@ -810,7 +841,9 @@ function buildWorkflowSteps({ sourceMode, fileMeta, asrApiKey, apiKey, hasSubtit
     || sourceMode === 'mic'
     || sourceMode === 'live'
     || Boolean(fileMeta);
-  const recognitionReady = sourceMode === 'file' ? Boolean(asrApiKey) : true;
+  const recognitionReady = sourceMode === 'file' || sourceMode === 'live'
+    ? Boolean(asrApiKey)
+    : true;
 
   return [
     { label: 'Input', icon: sourceMode === 'file' ? FileAudio : sourceMode === 'mic' ? Mic : sourceMode === 'live' ? Radio : Sparkles, done: inputReady },

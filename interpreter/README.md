@@ -8,7 +8,7 @@
 
 PR-14：演示材料与提交文案完善。
 
-当前已建立 Vite + React 前端工程，完成同传字幕工作台的静态界面，接入 Web Speech API STT 封装，实现 OpenAI-compatible 流式翻译引擎，完成可演示的翻译修正闭环，加入稳定 Demo 模式，支持文件上传后调用 OpenAI `/audio/transcriptions` 做真实英文转写，支持直播标签页/屏幕音频捕获入口，支持高级设置面板，接入 Web Audio 波形可视化，支持浏览器中文 TTS 播报，并支持导出 SRT / 复制双语文本。页面包含输入源选择、Provider 配置、File ASR 配置、术语表、字幕设置、时间轴字幕流、修正编辑器、底部大字幕和统计栏。
+当前已建立 Vite + React 前端工程，完成同传字幕工作台的静态界面，接入 Web Speech API STT 封装，实现 OpenAI-compatible 流式翻译引擎，完成可演示的翻译修正闭环，加入稳定 Demo 模式，支持文件上传后调用 OpenAI `/audio/transcriptions` 做真实英文转写，支持直播标签页/屏幕音频捕获并通过 MediaRecorder 分片送入 ASR，支持高级设置面板，接入 Web Audio 波形可视化，支持浏览器中文 TTS 播报，并支持导出 SRT / 复制双语文本。页面包含输入源选择、Provider 配置、File/Live ASR 配置、术语表、字幕设置、时间轴字幕流、修正编辑器、底部大字幕和统计栏。
 
 Demo 视频：待录制，提交前替换为公开可访问链接。
 
@@ -65,9 +65,11 @@ Chrome 或 Edge 中打开本地页面，点击输入源 `Mic`，再点击 `Start
 ## 直播模式验证
 
 1. 点击输入源 `Live`。
-2. 点击 `Choose tab audio`，选择一个带英文音频的浏览器标签页或屏幕。
-3. 左侧会显示捕获来源名称，并可点击 `Stop live capture` 释放所有音频 track。
-4. 当前 MVP 证明直播音频入口、权限流和资源释放；Web Speech API 不能直接消费该系统音频流，直接 ASR 识别会在 ASR Adapter 中扩展。
+2. 在 `File ASR` 面板填写 OpenAI ASR Key，Live 会复用同一套 `/audio/transcriptions` 配置。
+3. 点击 `Choose tab audio`，选择一个带英文音频的浏览器标签页或屏幕。
+4. 左侧会显示捕获来源名称，并可点击 `Stop live capture` 释放所有音频 track。
+5. 如果浏览器支持 MediaRecorder，系统会按设置的音频分片长度持续转写直播音频，并把转写文本送入翻译链路。
+6. 未填写 ASR Key 时，Live 只展示捕获和波形，不会伪装为真实转写。
 
 ## 设置面板验证
 
@@ -112,8 +114,8 @@ Chrome 或 Edge 中打开本地页面，点击输入源 `Mic`，再点击 `Start
 当前作品聚焦比赛题目二要求的“外语音频流实时翻译成中文、字幕/语音输出、翻译修正能力”。为了保证 72 小时内可稳定演示，系统提供三层能力：
 
 - 稳定评审闭环：Demo 模式可以在无 Key 情况下稳定展示“外语音频流输入 -> 中文字幕输出 -> 人工修正 -> 术语重译 -> TTS 播报 -> 导出”。
-- 真实浏览器能力：Mic 使用 Web Speech API 做英文语音识别；File 模式可调用 OpenAI ASR 做真实文件转写；Provider 配置后可走真实 OpenAI-compatible 流式翻译。
-- 扩展入口：Live 已实现系统音频捕获与波形分析，但 Web Speech API 不能直接消费任意系统音频流。直播音频的真实 ASR 分片识别仍需继续接入 MediaRecorder + ASR Adapter。
+- 真实浏览器能力：Mic 使用 Web Speech API 做英文语音识别；File 模式可调用 OpenAI ASR 做真实文件转写；Live 模式可通过 MediaRecorder 分片调用 ASR；Provider 配置后可走真实 OpenAI-compatible 流式翻译。
+- 能力限制：Live ASR 依赖浏览器 MediaRecorder、用户共享音频权限、ASR Key 和网络质量；分片转写不是毫秒级实时，适合 4 秒左右的准实时字幕。
 
 ## 已完成 PR 记录
 
@@ -133,6 +135,6 @@ Chrome 或 Edge 中打开本地页面，点击输入源 `Mic`，再点击 `Start
 
 ## 后续扩展
 
-- 将直播系统音频通过 MediaRecorder 切片发送到真实语音识别服务。
+- 优化 Live ASR 分片去重、静音过滤和延迟统计。
 - 增加自动质量评估，例如延迟、漏译率、术语命中率和人工修正前后对比。
 - 提交前录制 Demo 视频，并将公开链接替换到 README 顶部。
