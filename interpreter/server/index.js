@@ -45,7 +45,7 @@ server.listen(Number(process.env.PORT ?? DEFAULT_PORT), () => {
 });
 
 async function proxyTranslation(request, response) {
-  requireOpenAIKey();
+  if (!ensureOpenAIKey(response)) return;
   const payload = await readJson(request);
   const upstream = await fetch(`${OPENAI_BASE_URL.replace(/\/$/, '')}/chat/completions`, {
     method: 'POST',
@@ -80,7 +80,7 @@ async function proxyTranslation(request, response) {
 }
 
 async function proxyTranscription(request, response) {
-  requireOpenAIKey();
+  if (!ensureOpenAIKey(response)) return;
   const body = await readRawBody(request);
   const contentType = request.headers['content-type'];
   if (!contentType?.includes('multipart/form-data')) {
@@ -104,10 +104,15 @@ async function proxyTranscription(request, response) {
   response.end(text);
 }
 
-function requireOpenAIKey() {
+function ensureOpenAIKey(response) {
   if (!OPENAI_API_KEY) {
-    throw new Error('Missing OPENAI_API_KEY. Copy .env.example to .env and configure a server-side key.');
+    sendJson(response, 503, {
+      error: 'Missing OPENAI_API_KEY. Copy .env.example to .env and configure a server-side key.',
+      code: 'missing_server_key',
+    });
+    return false;
   }
+  return true;
 }
 
 async function readJson(request) {

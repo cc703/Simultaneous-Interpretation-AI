@@ -43,10 +43,11 @@ npm run dev:server
 
 ```bash
 npm test
+npm run smoke:file-asr
 npm run build
 ```
 
-`npm test` 使用 Node 原生测试覆盖质量诊断、修正记忆、SRT 和同传复盘报告生成。
+`npm test` 使用 Node 原生测试覆盖质量诊断、修正记忆、SRT 和同传复盘报告生成。`npm run smoke:file-asr` 会使用 `test-media/sample-english-speech.wav` 上传到本地后端；未配置 `OPENAI_API_KEY` 时应明确通过 `missing_server_key` 边界测试，配置 Key 后会要求返回真实英文转写。样本来源和下载方式见 `docs/file-asr-smoke.md`。
 
 ## STT 验证
 
@@ -82,7 +83,7 @@ Chrome 或 Edge 中打开本地页面，点击输入源 `Mic`，再点击 `Start
 
 1. 点击输入源 `File`，上传 `.mp3`、`.mp4`、`.wav`、`.m4a`、`.webm` 或 `.ogg` 文件。
 2. 在 `Configuration -> ASR` 填写 OpenAI ASR Key，或启动已配置 `OPENAI_API_KEY` 的本地后端代理；默认模型为 `gpt-4o-mini-transcribe`。
-3. 左侧会显示文件名、大小、格式和时长。
+3. 可使用 `test-media/sample-english-speech.wav` 作为英文语音测试文件，左侧会显示文件名、大小、格式和时长。
 4. 点击 `Start Interpreting` 后，系统会把文件发送到 `/audio/transcriptions` 做真实英文转写。
 5. 转写结果会按英文句子进入现有中文翻译、字幕修正、术语命中、TTS 和导出流程。
 6. 如果未填写浏览器 ASR Key 且后端没有配置 Key，文件模式会明确提示并降级为内置演示转写流，不会伪装成真实 ASR。
