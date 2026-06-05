@@ -466,35 +466,55 @@ export default function App() {
                     : 'Web Speech unavailable · Demo fallback ready')}
               </span>
             </div>
-            <div className="file-uploader">
-              <label>
-                <span><Upload size={13} /> Upload media</span>
-                <input
-                  accept=".mp3,.mp4,.wav,.m4a,.webm,.ogg,audio/*,video/*"
-                  type="file"
-                  onChange={handleFileChange}
-                />
-              </label>
-              {fileMeta && (
-                <div className="file-meta">
-                  <span>{formatBytes(fileMeta.size)}</span>
-                  <span>{fileMeta.duration ? formatDuration(fileMeta.duration) : 'duration pending'}</span>
-                  <span>{fileMeta.type}</span>
+            {sourceMode === 'demo' && (
+              <div className="mode-help-card">
+                <Sparkles size={16} />
+                <div>
+                  <strong>Ready without keys</strong>
+                  <span>点击下方按钮即可播放内置英文语音流，并流式生成中文字幕。</span>
                 </div>
-              )}
-              {fileStatus && <div className="file-status">{fileStatus}</div>}
-              {fileUrl && (
-                <audio
-                  ref={audioRef}
-                  controls
-                  src={fileUrl}
-                  onLoadedMetadata={handleAudioMetadata}
-                  onTimeUpdate={handleAudioTimeUpdate}
-                >
-                  <track kind="captions" />
-                </audio>
-              )}
-            </div>
+              </div>
+            )}
+            {sourceMode === 'mic' && (
+              <div className="mode-help-card">
+                <Mic size={16} />
+                <div>
+                  <strong>Browser microphone STT</strong>
+                  <span>点击开始后授权麦克风；英文 final 结果会进入翻译链路。</span>
+                </div>
+              </div>
+            )}
+            {sourceMode === 'file' && (
+              <div className="file-uploader">
+                <label>
+                  <span><Upload size={13} /> Upload media</span>
+                  <input
+                    accept=".mp3,.mp4,.wav,.m4a,.webm,.ogg,audio/*,video/*"
+                    type="file"
+                    onChange={handleFileChange}
+                  />
+                </label>
+                {fileMeta && (
+                  <div className="file-meta">
+                    <span>{formatBytes(fileMeta.size)}</span>
+                    <span>{fileMeta.duration ? formatDuration(fileMeta.duration) : 'duration pending'}</span>
+                    <span>{fileMeta.type}</span>
+                  </div>
+                )}
+                {fileStatus && <div className="file-status">{fileStatus}</div>}
+                {fileUrl && (
+                  <audio
+                    ref={audioRef}
+                    controls
+                    src={fileUrl}
+                    onLoadedMetadata={handleAudioMetadata}
+                    onTimeUpdate={handleAudioTimeUpdate}
+                  >
+                    <track kind="captions" />
+                  </audio>
+                )}
+              </div>
+            )}
             {sourceMode === 'live' && (
               <div className="live-capture-card">
                 <button type="button" onClick={handleLiveCapture}>
@@ -661,7 +681,7 @@ export default function App() {
           </section>
 
           <button className="run-button" type="button" onClick={handleRunClick}>
-            {isRunning ? 'Stop Interpreting' : 'Start Interpreting'}
+            {getRunButtonLabel({ isRunning, sourceMode, isCapturing })}
           </button>
         </aside>
 
@@ -985,4 +1005,13 @@ function getNextAction({
   if (!hasSubtitles) return '点击 Start Interpreting，开始生成第一批双语字幕。';
   if (correctionCount === 0) return '点击一条字幕，在 Correction Desk 里保存一次人工修正。';
   return '当前闭环已跑通，可以导出 SRT 或继续添加术语重译。';
+}
+
+function getRunButtonLabel({ isRunning, sourceMode, isCapturing }) {
+  if (isRunning) return 'Stop Interpreting';
+  if (sourceMode === 'demo') return 'Start Demo Interpretation';
+  if (sourceMode === 'mic') return 'Start Mic STT';
+  if (sourceMode === 'file') return 'Transcribe Uploaded File';
+  if (sourceMode === 'live') return isCapturing ? 'Stop Live Capture' : 'Choose Live Audio';
+  return 'Start Interpreting';
 }

@@ -30,7 +30,7 @@ Chrome 或 Edge 中打开本地页面，点击输入源 `Mic`，再点击 `Start
 
 ## 翻译验证
 
-当前翻译引擎支持 OpenAI-compatible SSE 流式响应，默认 Provider 为 DeepSeek。左侧 Provider 面板可选择 DeepSeek、OpenAI 或 Custom，并填写 API Key。API Key 只保存在当前页面内存状态中，不写入 localStorage。未填写 Key 时会明确显示“等待填写 API Key 后接入实时中文翻译”。
+当前翻译引擎支持 OpenAI-compatible SSE 流式响应，默认 Provider 为 DeepSeek。左侧 `Configuration -> Translate` 可选择 DeepSeek、OpenAI 或 Custom，并填写 API Key。API Key 只保存在当前页面内存状态中，不写入 localStorage。未填写 Key 时会明确显示“等待填写 API Key 后接入实时中文翻译”。
 
 ## 修正闭环验证
 
@@ -57,7 +57,7 @@ Chrome 或 Edge 中打开本地页面，点击输入源 `Mic`，再点击 `Start
 ## 文件模式验证
 
 1. 点击输入源 `File`，上传 `.mp3`、`.mp4`、`.wav`、`.m4a`、`.webm` 或 `.ogg` 文件。
-2. 在 `File ASR` 面板填写 OpenAI ASR Key，默认模型为 `gpt-4o-mini-transcribe`。
+2. 在 `Configuration -> ASR` 填写 OpenAI ASR Key，默认模型为 `gpt-4o-mini-transcribe`。
 3. 左侧会显示文件名、大小、格式和时长。
 4. 点击 `Start Interpreting` 后，系统会把文件发送到 `/audio/transcriptions` 做真实英文转写。
 5. 转写结果会按英文句子进入现有中文翻译、字幕修正、术语命中、TTS 和导出流程。
@@ -67,7 +67,7 @@ Chrome 或 Edge 中打开本地页面，点击输入源 `Mic`，再点击 `Start
 ## 直播模式验证
 
 1. 点击输入源 `Live`。
-2. 在 `File ASR` 面板填写 OpenAI ASR Key，Live 会复用同一套 `/audio/transcriptions` 配置。
+2. 在 `Configuration -> ASR` 填写 OpenAI ASR Key，Live 会复用同一套 `/audio/transcriptions` 配置。
 3. 点击 `Choose tab audio`，选择一个带英文音频的浏览器标签页或屏幕。
 4. 左侧会显示捕获来源名称，并可点击 `Stop live capture` 释放所有音频 track。
 5. 如果浏览器支持 MediaRecorder，系统会按设置的音频分片长度持续转写直播音频，并把转写文本送入翻译链路。

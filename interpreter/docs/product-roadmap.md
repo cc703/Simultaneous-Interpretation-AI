@@ -34,4 +34,5 @@
 
 - 继续收敛左栏信息密度，减少表单堆叠。已完成基础版：Provider、ASR、Terms 合并为 Configuration tabs。
 - 给输入源、ASR、翻译、修正、导出统一图标语言。
+- 输入区按 Demo / Mic / File / Live 分模式展示，避免上传控件误导所有模式。已完成。
 - 录制 Demo 视频前做一次端到端联调和 README 最终更新。
