@@ -39,10 +39,26 @@ npm run dev:server
 
 然后另开一个终端运行 `npm run dev`。Vite 会把 `/api/*` 转发到 `http://localhost:8787`。未启动后端时，Demo 模式仍可完整演示；填写浏览器内存 Key 时也可以继续走浏览器直连。
 
+如果使用第三方 OpenAI-compatible 网关，建议分开配置：
+
+```env
+OPENAI_TRANSLATION_BASE_URL=https://your-chat-compatible.example/v1
+OPENAI_ASR_BASE_URL=https://api.openai.com/v1
+OPENAI_TRANSLATION_API_KEY=你的聊天网关Key
+OPENAI_ASR_API_KEY=你的官方OpenAI或支持音频转写的Key
+```
+
+很多第三方聊天网关只支持 `/chat/completions`，不支持 `/audio/transcriptions`。可用以下命令检查当前 `.env` 的接口可达性：
+
+```bash
+npm run check:api
+```
+
 验证命令：
 
 ```bash
 npm test
+npm run check:api
 npm run smoke:file-asr
 npm run build
 ```

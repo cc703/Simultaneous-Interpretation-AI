@@ -34,7 +34,9 @@ if (response.status === 503 && payload.code === 'missing_server_key') {
 }
 
 if (!response.ok) {
-  throw new Error(`ASR smoke failed: ${response.status} ${bodyText}`);
+  const code = payload.code ? ` ${payload.code}` : '';
+  const upstream = payload.upstreamBaseUrl ? ` upstream=${payload.upstreamBaseUrl}` : '';
+  throw new Error(`ASR smoke failed: ${response.status}${code}${upstream} ${payload.error ?? bodyText}`);
 }
 
 if (!payload.text?.trim()) {
