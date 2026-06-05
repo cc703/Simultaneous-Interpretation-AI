@@ -1364,7 +1364,7 @@ function getRunButtonLabel({ isRunning, sourceMode, isCapturing }) {
 }
 
 function getLivePrimaryAction({ isCapturing, liveStage, hasLiveAsr }) {
-  if (isCapturing && hasLiveAsr && liveStage === 'running') return 'Live ASR running';
+  if (isCapturing && hasLiveAsr && liveStage === 'running') return 'Stop live capture';
   if (isCapturing && !hasLiveAsr) return 'Audio captured · ASR not configured';
   if (isCapturing) return 'Stop live capture';
   return 'Choose live audio';

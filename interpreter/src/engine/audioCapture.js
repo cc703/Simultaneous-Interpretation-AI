@@ -14,6 +14,11 @@ export async function startSystemAudioCapture({ onAudioStream, onError } = {}) {
     });
 
     const audioTracks = stream.getAudioTracks();
+    if (audioTracks.length === 0) {
+      stream.getTracks().forEach((track) => track.stop());
+      throw new Error('未检测到共享音频，请重新选择标签页或屏幕并确认共享音频。');
+    }
+
     const videoLabel = stream.getVideoTracks()[0]?.label ?? 'Shared screen';
     const audioStream = new MediaStream(audioTracks);
 

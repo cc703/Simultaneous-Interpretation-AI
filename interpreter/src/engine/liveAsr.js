@@ -7,6 +7,7 @@ let active = false;
 let processing = Promise.resolve();
 let stats = { queued: 0, processed: 0, skipped: 0, duplicates: 0, lastLatencyMs: 0 };
 let lastTranscript = '';
+let sessionId = 0;
 
 export function isLiveASRSupported() {
   return typeof window !== 'undefined' && 'MediaRecorder' in window;
@@ -28,6 +29,8 @@ export function startLiveASR(stream, {
   const mimeType = pickMimeType();
   recorder = new MediaRecorder(stream, mimeType ? { mimeType } : undefined);
   active = true;
+  sessionId += 1;
+  const currentSessionId = sessionId;
   chunkIndex = 0;
   stats = { queued: 0, processed: 0, skipped: 0, duplicates: 0, lastLatencyMs: 0 };
   lastTranscript = '';
@@ -48,6 +51,7 @@ export function startLiveASR(stream, {
     emitStats(onStats);
     processing = processing.then(() => processChunk(event.data, {
       index,
+      sessionId: currentSessionId,
       apiKey,
       baseUrl,
       model,
@@ -69,14 +73,15 @@ export function startLiveASR(stream, {
 
 export function stopLiveASR() {
   active = false;
+  sessionId += 1;
   if (recorder && recorder.state !== 'inactive') {
     recorder.stop();
   }
   recorder = null;
 }
 
-async function processChunk(blob, { index, apiKey, baseUrl, model, onStatus, onStats }) {
-  if (!active) return;
+async function processChunk(blob, { index, sessionId: chunkSessionId, apiKey, baseUrl, model, onStatus, onStats }) {
+  if (!isCurrentSession(chunkSessionId)) return;
   const startedAt = performance.now();
   onStatus?.(`正在转写直播片段 #${index}...`);
   useStore.getState().updateCurrentInterim({
@@ -92,6 +97,7 @@ async function processChunk(blob, { index, apiKey, baseUrl, model, onStatus, onS
       baseUrl,
       model,
     });
+    if (!isCurrentSession(chunkSessionId)) return;
     if (!transcript.trim()) return;
     if (isDuplicateTranscript(transcript, lastTranscript)) {
       stats.duplicates += 1;
@@ -104,8 +110,10 @@ async function processChunk(blob, { index, apiKey, baseUrl, model, onStatus, onS
     stats.lastLatencyMs = Math.round(performance.now() - startedAt);
     emitStats(onStats);
     onStatus?.(`直播片段 #${index} 已转写，正在翻译。`);
+    if (!isCurrentSession(chunkSessionId)) return;
     await translateTranscriptText(transcript);
   } catch (error) {
+    if (!isCurrentSession(chunkSessionId)) return;
     console.warn('[live-asr] chunk failed:', error);
     onStatus?.(error.message || `直播片段 #${index} 转写失败。`);
     useStore.getState().updateCurrentInterim({
@@ -113,6 +121,10 @@ async function processChunk(blob, { index, apiKey, baseUrl, model, onStatus, onS
       zh: error.message || '直播 ASR 失败，请检查 Key、网络或浏览器权限。',
     });
   }
+}
+
+function isCurrentSession(chunkSessionId) {
+  return active && chunkSessionId === sessionId;
 }
 
 function pickMimeType() {
