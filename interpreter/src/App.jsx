@@ -1,3 +1,4 @@
+import { useEffect, useMemo, useState } from 'react';
 import { mockGlossary, mockSubtitles } from './mock/subtitles.js';
 import { isSTTSupported, startSTTSession, stopSTTSession } from './engine/index.js';
 import { useStore } from './store/index.js';
@@ -6,12 +7,35 @@ export default function App() {
   const isRunning = useStore((state) => state.isRunning);
   const latencyMs = useStore((state) => state.latencyMs);
   const currentInterim = useStore((state) => state.currentInterim);
-  const liveSubtitles = useStore((state) => state.subtitles);
-  const activeSubtitle = mockSubtitles.find((subtitle) => subtitle.isCurrent) ?? mockSubtitles.at(-1);
-  const displaySubtitles = liveSubtitles.length > 0 ? liveSubtitles : mockSubtitles;
-  const latestSubtitle = displaySubtitles.find((subtitle) => subtitle.isCurrent)
-    ?? displaySubtitles.at(-1)
-    ?? activeSubtitle;
+  const subtitles = useStore((state) => state.subtitles);
+  const glossary = useStore((state) => state.glossary);
+  const correctionCount = useStore((state) => state.correctionCount);
+  const selectedSubtitleId = useStore((state) => state.selectedSubtitleId);
+  const applyDemoTranscript = useStore((state) => state.applyDemoTranscript);
+  const addGlossaryTerm = useStore((state) => state.addGlossaryTerm);
+  const selectSubtitle = useStore((state) => state.selectSubtitle);
+  const updateSubtitleTranslation = useStore((state) => state.updateSubtitleTranslation);
+  const retranslateSubtitle = useStore((state) => state.retranslateSubtitle);
+  const [draftZh, setDraftZh] = useState('');
+  const [termSource, setTermSource] = useState('');
+  const [termTarget, setTermTarget] = useState('');
+  const displaySubtitles = subtitles.length > 0 ? subtitles : mockSubtitles;
+  const selectedSubtitle = useMemo(() => (
+    displaySubtitles.find((subtitle) => subtitle.id === selectedSubtitleId)
+      ?? displaySubtitles.find((subtitle) => subtitle.isCurrent)
+      ?? displaySubtitles.at(-1)
+  ), [displaySubtitles, selectedSubtitleId]);
+
+  useEffect(() => {
+    if (subtitles.length === 0) {
+      applyDemoTranscript(mockSubtitles);
+      mockGlossary.forEach((term) => addGlossaryTerm(term));
+    }
+  }, [addGlossaryTerm, applyDemoTranscript, subtitles.length]);
+
+  useEffect(() => {
+    setDraftZh(selectedSubtitle?.zh ?? '');
+  }, [selectedSubtitle?.id, selectedSubtitle?.zh]);
 
   const handleRunClick = () => {
     if (isRunning) {
@@ -20,6 +44,27 @@ export default function App() {
     }
 
     startSTTSession();
+  };
+
+  const handleSaveCorrection = () => {
+    if (!selectedSubtitle || !draftZh.trim()) return;
+    updateSubtitleTranslation(
+      selectedSubtitle.id,
+      draftZh.trim(),
+      'manual',
+      '用户在修正编辑器中保存译文',
+    );
+  };
+
+  const handleAddTerm = () => {
+    if (!termSource.trim() || !termTarget.trim()) return;
+    addGlossaryTerm({
+      source: termSource.trim(),
+      target: termTarget.trim(),
+      note: '用户添加',
+    });
+    setTermSource('');
+    setTermTarget('');
   };
 
   return (
@@ -74,12 +119,27 @@ export default function App() {
           <section className="panel-block">
             <h2>Glossary</h2>
             <div className="glossary-list">
-              {mockGlossary.map((term) => (
-                <div className={term.enabled ? 'term enabled' : 'term'} key={term.source}>
+              {glossary.map((term) => (
+                <div className={term.enabled ? 'term enabled' : 'term'} key={term.id ?? term.source}>
                   <span>{term.source}</span>
                   <strong>{term.target}</strong>
                 </div>
               ))}
+            </div>
+            <div className="term-form">
+              <input
+                aria-label="Glossary source"
+                placeholder="source term"
+                value={termSource}
+                onChange={(event) => setTermSource(event.target.value)}
+              />
+              <input
+                aria-label="Glossary target"
+                placeholder="中文译法"
+                value={termTarget}
+                onChange={(event) => setTermTarget(event.target.value)}
+              />
+              <button type="button" onClick={handleAddTerm}>Add term</button>
             </div>
           </section>
 
@@ -139,7 +199,11 @@ export default function App() {
               </article>
             )}
             {displaySubtitles.map((subtitle) => (
-              <article className={`subtitle-card ${subtitle.correctionType ?? ''}`} key={subtitle.id}>
+              <article
+                className={`subtitle-card ${subtitle.correctionType ?? ''} ${subtitle.id === selectedSubtitle?.id ? 'selected' : ''}`}
+                key={subtitle.id}
+                onClick={() => selectSubtitle(subtitle.id)}
+              >
                 <div className="subtitle-meta">
                   <time>{subtitle.timeLabel}</time>
                   {subtitle.correctionType && (
@@ -160,22 +224,29 @@ export default function App() {
           <div className="correction-editor">
             <div>
               <h2>Correction Desk</h2>
-              <p>{latestSubtitle.en}</p>
+              <p>{selectedSubtitle.en}</p>
             </div>
-            <div className="editor-preview">{latestSubtitle.zh}</div>
-            <button type="button">Save correction</button>
-            <button type="button">Retranslate with glossary</button>
+            <textarea
+              className="editor-preview"
+              aria-label="Corrected Chinese subtitle"
+              value={draftZh}
+              onChange={(event) => setDraftZh(event.target.value)}
+            />
+            <button type="button" onClick={handleSaveCorrection}>Save correction</button>
+            <button type="button" onClick={() => retranslateSubtitle(selectedSubtitle.id)}>
+              Retranslate with glossary
+            </button>
           </div>
 
           <div className="subtitle-banner">
             <span>Current Chinese Subtitle</span>
-            <strong>{currentInterim.zh || latestSubtitle.zh}</strong>
+            <strong>{currentInterim.zh || selectedSubtitle.zh}</strong>
           </div>
 
           <footer className="stats-bar">
             <span>Translated {displaySubtitles.length}</span>
-            <span>Corrections 3</span>
-            <span>Glossary 3</span>
+            <span>Corrections {correctionCount}</span>
+            <span>Glossary {glossary.length}</span>
             <span>Provider DeepSeek</span>
           </footer>
         </section>

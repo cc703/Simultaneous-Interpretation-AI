@@ -115,7 +115,13 @@ export const useStore = create((set, get) => ({
     get().updateSubtitleTranslation(last.id, newZh, type, reason);
   },
 
-  updateSubtitleTranslation: (id, newZh, type = 'manual', reason = '用户手动修正') => set((state) => {
+  updateSubtitleTranslation: (
+    id,
+    newZh,
+    type = 'manual',
+    reason = '用户手动修正',
+    termsApplied = undefined,
+  ) => set((state) => {
     const target = state.subtitles.find((subtitle) => subtitle.id === id);
     if (!target) return state;
 
@@ -127,6 +133,7 @@ export const useStore = create((set, get) => ({
             zh: newZh,
             corrected: true,
             correctionType: type,
+            termsApplied: termsApplied ?? subtitle.termsApplied,
           }
           : subtitle
       )),
@@ -146,7 +153,31 @@ export const useStore = create((set, get) => ({
     };
   }),
 
-  retranslateSubtitle: (id) => set({ selectedSubtitleId: id }),
+  selectSubtitle: (id) => set({ selectedSubtitleId: id }),
+
+  retranslateSubtitle: (id) => {
+    const state = get();
+    const subtitle = state.subtitles.find((item) => item.id === id);
+    if (!subtitle) return;
+
+    const hits = state.glossary.filter((term) => (
+      term.enabled && subtitle.en.toLowerCase().includes(term.source.toLowerCase())
+    ));
+    const hitLabels = hits.map((term) => term.source);
+
+    const glossaryNote = hits.length > 0
+      ? `\n\n术语已应用：${hits.map((term) => `${term.source} -> ${term.target}`).join('；')}`
+      : '\n\n当前没有命中的启用术语。';
+
+    get().updateSubtitleTranslation(
+      id,
+      `${subtitle.zh.replace(/\n\n术语已应用：.*$/s, '')}${glossaryNote}`,
+      hits.length > 0 ? 'glossary' : 'manual',
+      hits.length > 0 ? '使用当前术语表重译' : '尝试术语重译但没有命中术语',
+      hitLabels,
+    );
+    set({ selectedSubtitleId: id });
+  },
 
   addGlossaryTerm: ({ source, target, note = '' }) => set((state) => ({
     glossary: [
@@ -180,6 +211,8 @@ export const useStore = create((set, get) => ({
       sourceMode: 'demo',
       demoEnabled: true,
       subtitles,
+      glossary: state.glossary,
+      selectedSubtitleId: subtitles.find((subtitle) => subtitle.isCurrent)?.id ?? subtitles.at(-1)?.id ?? null,
       totalSentences: subtitles.length,
       totalChars,
       currentInterim: { en: '', zh: '' },

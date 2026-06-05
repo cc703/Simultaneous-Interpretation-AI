@@ -251,6 +251,30 @@ button {
   font-size: 14px;
 }
 
+.term-form {
+  display: grid;
+  gap: 8px;
+  margin-top: 12px;
+}
+
+.term-form input {
+  width: 100%;
+  min-height: 34px;
+  border: 1px solid var(--border);
+  border-radius: 6px;
+  padding: 0 10px;
+  color: var(--text);
+  background: #080d11;
+}
+
+.term-form button {
+  min-height: 34px;
+  border: 1px solid rgba(0, 212, 255, 0.35);
+  border-radius: 6px;
+  color: var(--accent);
+  background: rgba(0, 212, 255, 0.08);
+}
+
 .toggle-line {
   display: flex;
   align-items: center;
@@ -355,6 +379,7 @@ button {
   border-left: 4px solid var(--dim);
   border-radius: 8px;
   background: rgba(13, 19, 24, 0.86);
+  cursor: pointer;
 }
 
 .subtitle-card.manual,
@@ -366,6 +391,11 @@ button {
 .subtitle-card.interim {
   border-left-color: var(--accent);
   background: rgba(0, 212, 255, 0.06);
+}
+
+.subtitle-card.selected {
+  border-color: rgba(0, 212, 255, 0.58);
+  box-shadow: 0 0 0 1px rgba(0, 212, 255, 0.16), 0 0 28px rgba(0, 212, 255, 0.08);
 }
 
 .subtitle-meta {
@@ -430,6 +460,13 @@ button {
   border-radius: 7px;
   color: var(--amber);
   background: rgba(255, 179, 71, 0.06);
+}
+
+textarea.editor-preview {
+  width: 100%;
+  min-height: 72px;
+  resize: vertical;
+  font: 600 14px/1.45 "Noto Sans SC", sans-serif;
 }
 
 .correction-editor button {
