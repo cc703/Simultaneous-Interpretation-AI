@@ -552,12 +552,15 @@ button {
 }
 
 .mode-tabs {
-  display: flex;
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, auto));
   gap: 6px;
 }
 
 .mode-tabs button {
+  min-width: 76px;
   padding: 0 12px;
+  white-space: nowrap;
 }
 
 .toolbar-note,

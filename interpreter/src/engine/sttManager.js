@@ -56,7 +56,9 @@ function wireEngineToStore(engine) {
           text,
           context: buildContext(store.subtitles, store.contextWindow),
           glossary: store.terminologyBoost ? buildGlossaryPrompt(store.glossary) : '',
-          correctionMemory: buildCorrectionMemoryPrompt(store.correctionHistory, store.subtitles),
+          correctionMemory: store.autoCorrect
+            ? buildCorrectionMemoryPrompt(store.correctionHistory, store.subtitles)
+            : '',
           targetLanguage: store.targetLanguage,
           translationStyle: store.translationStyle,
           provider: store.provider,

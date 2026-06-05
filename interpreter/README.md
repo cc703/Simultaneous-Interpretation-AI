@@ -80,6 +80,12 @@ Chrome 或 Edge 中打开本地页面，点击输入源 `Mic`，再点击 `Start
 - Provider、Custom Base URL 和翻译参数会保存到 localStorage。
 - API Key 只保存在当前内存状态中，不写入 localStorage。
 
+## 字幕显示验证
+
+- 右上 `Bilingual` / `ZH only` / `EN only` 会实时切换字幕展示方式。
+- 左侧 `Subtitle Settings` 可控制是否显示英文原文、底部大字幕、修正记忆和中文语音输出。
+- 关闭 `Auto correction memory` 后，后续真实翻译不会注入人工修正记忆。
+
 ## 波形验证
 
 - 文件模式开始播放后，波形条会读取 `<audio>` 的 Web Audio 频谱数据。

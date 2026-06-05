@@ -83,10 +83,12 @@ export async function translateTranscriptText(text) {
         text: sentence,
         context: buildContext(useStore.getState().subtitles, store.contextWindow),
         glossary: store.terminologyBoost ? buildGlossaryPrompt(useStore.getState().glossary) : '',
-        correctionMemory: buildCorrectionMemoryPrompt(
-          useStore.getState().correctionHistory,
-          useStore.getState().subtitles,
-        ),
+        correctionMemory: useStore.getState().autoCorrect
+          ? buildCorrectionMemoryPrompt(
+            useStore.getState().correctionHistory,
+            useStore.getState().subtitles,
+          )
+          : '',
         targetLanguage: store.targetLanguage,
         translationStyle: store.translationStyle,
         provider: store.provider,

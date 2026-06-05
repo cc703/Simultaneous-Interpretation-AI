@@ -57,6 +57,10 @@ export default function App() {
   const contextWindow = useStore((state) => state.contextWindow);
   const chunkSeconds = useStore((state) => state.chunkSeconds);
   const terminologyBoost = useStore((state) => state.terminologyBoost);
+  const subtitleMode = useStore((state) => state.subtitleMode);
+  const showBanner = useStore((state) => state.showBanner);
+  const showOriginal = useStore((state) => state.showOriginal);
+  const autoCorrect = useStore((state) => state.autoCorrect);
   const voiceOutput = useStore((state) => state.voiceOutput);
   const ttsRate = useStore((state) => state.ttsRate);
   const ttsQuality = useStore((state) => state.ttsQuality);
@@ -80,6 +84,10 @@ export default function App() {
   const setContextWindow = useStore((state) => state.setContextWindow);
   const setChunkSeconds = useStore((state) => state.setChunkSeconds);
   const setTerminologyBoost = useStore((state) => state.setTerminologyBoost);
+  const setSubtitleMode = useStore((state) => state.setSubtitleMode);
+  const setShowBanner = useStore((state) => state.setShowBanner);
+  const setShowOriginal = useStore((state) => state.setShowOriginal);
+  const setAutoCorrect = useStore((state) => state.setAutoCorrect);
   const setVoiceOutput = useStore((state) => state.setVoiceOutput);
   const setStoreTtsRate = useStore((state) => state.setTtsRate);
   const setTtsQuality = useStore((state) => state.setTtsQuality);
@@ -663,12 +671,28 @@ export default function App() {
           <section className="panel-block">
             <h2>Subtitle Settings</h2>
             <label className="toggle-line">
-              <input type="checkbox" defaultChecked />
-              <span>Bilingual captions</span>
+              <input
+                checked={showOriginal}
+                type="checkbox"
+                onChange={(event) => setShowOriginal(event.target.checked)}
+              />
+              <span>Show original English</span>
             </label>
             <label className="toggle-line">
-              <input type="checkbox" defaultChecked />
-              <span>Auto correction</span>
+              <input
+                checked={showBanner}
+                type="checkbox"
+                onChange={(event) => setShowBanner(event.target.checked)}
+              />
+              <span>Bottom subtitle banner</span>
+            </label>
+            <label className="toggle-line">
+              <input
+                checked={autoCorrect}
+                type="checkbox"
+                onChange={(event) => setAutoCorrect(event.target.checked)}
+              />
+              <span>Auto correction memory</span>
             </label>
             <label className="toggle-line">
               <input
@@ -688,9 +712,27 @@ export default function App() {
         <section className="right-panel" aria-label="Subtitle workspace">
           <div className="toolbar">
             <div className="mode-tabs">
-              <button type="button" className="active">Bilingual</button>
-              <button type="button">ZH only</button>
-              <button type="button">EN only</button>
+              <button
+                type="button"
+                className={subtitleMode === 'bilingual' ? 'active' : ''}
+                onClick={() => setSubtitleMode('bilingual')}
+              >
+                Bilingual
+              </button>
+              <button
+                type="button"
+                className={subtitleMode === 'zh-only' ? 'active' : ''}
+                onClick={() => setSubtitleMode('zh-only')}
+              >
+                ZH only
+              </button>
+              <button
+                type="button"
+                className={subtitleMode === 'en-only' ? 'active' : ''}
+                onClick={() => setSubtitleMode('en-only')}
+              >
+                EN only
+              </button>
             </div>
             <div className="toolbar-note">
               Latency {latencyMs ? `${(latencyMs / 1000).toFixed(1)}s` : '1.8s'} · Context window {contextWindow}
@@ -736,10 +778,14 @@ export default function App() {
                   <time>ready</time>
                   <span>演示待开始</span>
                 </div>
-                <p className="source-text">
-                  Click Start Interpreting to play the built-in English voice stream.
-                </p>
-                <p className="translated-text">点击开始后，系统会模拟外语音频输入，并流式生成中文字幕。</p>
+                {shouldShowOriginal(subtitleMode, showOriginal) && (
+                  <p className="source-text">
+                    Click Start Interpreting to play the built-in English voice stream.
+                  </p>
+                )}
+                {shouldShowChinese(subtitleMode) && (
+                  <p className="translated-text">点击开始后，系统会模拟外语音频输入，并流式生成中文字幕。</p>
+                )}
               </article>
             )}
             {currentInterim.en && (
@@ -748,8 +794,12 @@ export default function App() {
                   <time>live</time>
                   <span>识别中</span>
                 </div>
-                <p className="source-text">{currentInterim.en}</p>
-                <p className="translated-text">{currentInterim.zh || '等待最终识别...'}</p>
+                {shouldShowOriginal(subtitleMode, showOriginal) && (
+                  <p className="source-text">{currentInterim.en}</p>
+                )}
+                {shouldShowChinese(subtitleMode) && (
+                  <p className="translated-text">{currentInterim.zh || '等待最终识别...'}</p>
+                )}
               </article>
             )}
             {displaySubtitles.map((subtitle) => (
@@ -758,6 +808,8 @@ export default function App() {
                 isSelected={subtitle.id === selectedSubtitle?.id}
                 key={subtitle.id}
                 onSelect={() => selectSubtitle(subtitle.id)}
+                showOriginal={shouldShowOriginal(subtitleMode, showOriginal)}
+                showChinese={shouldShowChinese(subtitleMode)}
                 subtitle={subtitle}
               />
             ))}
@@ -821,10 +873,12 @@ export default function App() {
             </button>
           </div>
 
-          <div className="subtitle-banner">
-            <span>Current Chinese Subtitle</span>
-            <strong>{currentInterim.zh || selectedSubtitle.zh}</strong>
-          </div>
+          {showBanner && (
+            <div className="subtitle-banner">
+              <span>{subtitleMode === 'en-only' ? 'Current English Subtitle' : 'Current Chinese Subtitle'}</span>
+              <strong>{subtitleMode === 'en-only' ? (currentInterim.en || selectedSubtitle.en) : (currentInterim.zh || selectedSubtitle.zh)}</strong>
+            </div>
+          )}
 
           <footer className="stats-bar">
             <span>Translated {displaySubtitles.length}</span>
@@ -941,7 +995,7 @@ function getWaveformLevel(waveformData, index) {
   return Math.max(8, Math.round((value / 255) * 70));
 }
 
-function SubtitleCard({ subtitle, analysis, isSelected, onSelect }) {
+function SubtitleCard({ subtitle, analysis, isSelected, onSelect, showOriginal, showChinese }) {
   const visibleIssues = analysis?.issues ?? [];
 
   return (
@@ -960,8 +1014,8 @@ function SubtitleCard({ subtitle, analysis, isSelected, onSelect }) {
           ))}
         </div>
       </div>
-      <p className="source-text">{subtitle.en}</p>
-      <p className="translated-text">{subtitle.zh}</p>
+      {showOriginal && <p className="source-text">{subtitle.en}</p>}
+      {showChinese && <p className="translated-text">{subtitle.zh}</p>}
       {subtitle.termsApplied.length > 0 && (
         <div className="term-hits">
           {subtitle.termsApplied.map((term) => <code key={term}>{term}</code>)}
@@ -1014,4 +1068,14 @@ function getRunButtonLabel({ isRunning, sourceMode, isCapturing }) {
   if (sourceMode === 'file') return 'Transcribe Uploaded File';
   if (sourceMode === 'live') return isCapturing ? 'Stop Live Capture' : 'Choose Live Audio';
   return 'Start Interpreting';
+}
+
+function shouldShowOriginal(subtitleMode, showOriginal) {
+  if (subtitleMode === 'zh-only') return false;
+  if (subtitleMode === 'en-only') return true;
+  return showOriginal;
+}
+
+function shouldShowChinese(subtitleMode) {
+  return subtitleMode !== 'en-only';
 }
