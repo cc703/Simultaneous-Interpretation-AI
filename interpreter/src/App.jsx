@@ -1,17 +1,24 @@
 import { useEffect, useMemo, useState } from 'react';
 import { mockGlossary, mockSubtitles } from './mock/subtitles.js';
-import { isSTTSupported, startSTTSession, stopSTTSession } from './engine/index.js';
+import {
+  isSTTSupported,
+  startDemoStream,
+  startSTTSession,
+  stopDemoStream,
+  stopSTTSession,
+} from './engine/index.js';
 import { useStore } from './store/index.js';
 
 export default function App() {
   const isRunning = useStore((state) => state.isRunning);
   const latencyMs = useStore((state) => state.latencyMs);
   const currentInterim = useStore((state) => state.currentInterim);
+  const sourceMode = useStore((state) => state.sourceMode);
   const subtitles = useStore((state) => state.subtitles);
   const glossary = useStore((state) => state.glossary);
   const correctionCount = useStore((state) => state.correctionCount);
   const selectedSubtitleId = useStore((state) => state.selectedSubtitleId);
-  const applyDemoTranscript = useStore((state) => state.applyDemoTranscript);
+  const setSourceMode = useStore((state) => state.setSourceMode);
   const addGlossaryTerm = useStore((state) => state.addGlossaryTerm);
   const selectSubtitle = useStore((state) => state.selectSubtitle);
   const updateSubtitleTranslation = useStore((state) => state.updateSubtitleTranslation);
@@ -27,11 +34,10 @@ export default function App() {
   ), [displaySubtitles, selectedSubtitleId]);
 
   useEffect(() => {
-    if (subtitles.length === 0) {
-      applyDemoTranscript(mockSubtitles);
+    if (glossary.length === 0) {
       mockGlossary.forEach((term) => addGlossaryTerm(term));
     }
-  }, [addGlossaryTerm, applyDemoTranscript, subtitles.length]);
+  }, [addGlossaryTerm, glossary.length]);
 
   useEffect(() => {
     setDraftZh(selectedSubtitle?.zh ?? '');
@@ -39,11 +45,21 @@ export default function App() {
 
   const handleRunClick = () => {
     if (isRunning) {
-      stopSTTSession();
+      if (sourceMode === 'demo') {
+        stopDemoStream();
+        useStore.getState().stopTranslation();
+      } else {
+        stopSTTSession();
+      }
       return;
     }
 
-    startSTTSession();
+    if (sourceMode === 'mic') {
+      startSTTSession();
+      return;
+    }
+
+    startDemoStream();
   };
 
   const handleSaveCorrection = () => {
@@ -79,7 +95,7 @@ export default function App() {
         </div>
         <div className="status-pill">
           <span />
-          {isRunning ? 'Mic stream active' : 'Demo stream active'}
+          {isRunning ? `${sourceMode} stream active` : 'Demo stream ready'}
         </div>
         <div className="top-actions" aria-label="Header actions">
           <button type="button">Export</button>
@@ -92,17 +108,31 @@ export default function App() {
           <section className="panel-block">
             <h2>Input Source</h2>
             <div className="segmented">
-              <button type="button" className="active">Demo</button>
-              <button type="button">Mic</button>
-              <button type="button">File</button>
-              <button type="button">Live</button>
+              <button
+                type="button"
+                className={sourceMode === 'demo' ? 'active' : ''}
+                onClick={() => setSourceMode('demo')}
+              >
+                Demo
+              </button>
+              <button
+                type="button"
+                className={sourceMode === 'mic' ? 'active' : ''}
+                onClick={() => setSourceMode('mic')}
+              >
+                Mic
+              </button>
+              <button type="button" onClick={() => setSourceMode('file')}>File</button>
+              <button type="button" onClick={() => setSourceMode('live')}>Live</button>
             </div>
             <div className="source-card">
               <strong>Global AI Product Launch</strong>
               <span>
-                {isSTTSupported()
-                  ? 'Mic STT available · Demo fallback ready'
-                  : 'Web Speech unavailable · Demo fallback ready'}
+                {sourceMode === 'demo'
+                  ? 'Stable review demo · captions stream by timeline'
+                  : (isSTTSupported()
+                    ? 'Mic STT available · Demo fallback ready'
+                    : 'Web Speech unavailable · Demo fallback ready')}
               </span>
             </div>
           </section>
@@ -188,6 +218,18 @@ export default function App() {
           <div className="progress-track"><span /></div>
 
           <div className="subtitle-scroll">
+            {displaySubtitles.length === 0 && !currentInterim.en && (
+              <article className="subtitle-card empty-state">
+                <div className="subtitle-meta">
+                  <time>ready</time>
+                  <span>演示待开始</span>
+                </div>
+                <p className="source-text">
+                  Click Start Interpreting to play the built-in review transcript.
+                </p>
+                <p className="translated-text">点击开始后，字幕会按时间逐句出现。</p>
+              </article>
+            )}
             {currentInterim.en && (
               <article className="subtitle-card interim">
                 <div className="subtitle-meta">

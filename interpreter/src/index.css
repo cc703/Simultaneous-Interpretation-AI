@@ -393,6 +393,11 @@ button {
   background: rgba(0, 212, 255, 0.06);
 }
 
+.subtitle-card.empty-state {
+  border-left-color: var(--green);
+  border-style: dashed;
+}
+
 .subtitle-card.selected {
   border-color: rgba(0, 212, 255, 0.58);
   box-shadow: 0 0 0 1px rgba(0, 212, 255, 0.16), 0 0 28px rgba(0, 212, 255, 0.08);

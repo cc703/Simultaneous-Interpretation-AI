@@ -11,3 +11,8 @@ export {
   buildGlossaryPrompt,
   streamTranslate,
 } from './translator.js';
+export {
+  getDemoTranscript,
+  startDemoStream,
+  stopDemoStream,
+} from './demoStream.js';

@@ -27,7 +27,7 @@ const normalizeSubtitle = (entry, state) => {
 
 export const useStore = create((set, get) => ({
   // 音频源
-  sourceMode: 'mic',
+  sourceMode: 'demo',
   uploadedFile: null,
   isCapturing: false,
   demoEnabled: false,

@@ -6,11 +6,11 @@
 
 ## 当前阶段
 
-PR-06：翻译修正闭环。
+PR-10：Demo 模式与演示脚本。
 
-当前已建立 Vite + React + Tailwind CSS 基础工程，完成同传字幕工作台的静态界面，接入 Web Speech API STT 封装，实现 OpenAI-compatible 流式翻译引擎，并完成可演示的翻译修正闭环。页面包含输入源选择、Provider 配置、术语表、字幕设置、mock 双语字幕、修正编辑器、底部大字幕和统计栏。
+当前已建立 Vite + React + Tailwind CSS 基础工程，完成同传字幕工作台的静态界面，接入 Web Speech API STT 封装，实现 OpenAI-compatible 流式翻译引擎，完成可演示的翻译修正闭环，并加入稳定 Demo 模式。页面包含输入源选择、Provider 配置、术语表、字幕设置、时间轴字幕流、修正编辑器、底部大字幕和统计栏。
 
-导出和 Demo 流会按 `../design.md` 的 PR 顺序逐步实现。
+导出功能会按 `../design.md` 的 PR 顺序继续实现。
 
 ## 快速开始
 
@@ -39,6 +39,16 @@ Chrome 或 Edge 中打开本地页面，点击 `Start Interpreting` 后授权麦
 3. 点击 `Save correction`，字幕会标记为用户修正，修正计数增加。
 4. 在左侧术语表输入 source 和中文译法，点击 `Add term`。
 5. 点击 `Retranslate with glossary`，命中术语的字幕会标记为术语命中。
+
+## Demo 模式验证
+
+不填写 API Key 也可以验证完整产品闭环：
+
+1. 保持输入源为 `Demo`。
+2. 点击 `Start Interpreting`。
+3. 字幕会按时间逐条出现，而不是一次性显示全部内容。
+4. 示例脚本包含 `latency budget`、`pitch deck`、`edge device` 三个术语。
+5. Demo 字幕仍可继续执行人工修正、添加术语和术语重译。
 
 ## 计划功能
 
