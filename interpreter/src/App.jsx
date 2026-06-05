@@ -8,6 +8,7 @@ import {
   stopSTTSession,
 } from './engine/index.js';
 import { useStore } from './store/index.js';
+import { copyBilingual, exportSRT } from './utils/export.js';
 
 export default function App() {
   const isRunning = useStore((state) => state.isRunning);
@@ -83,6 +84,14 @@ export default function App() {
     setTermTarget('');
   };
 
+  const handleExport = () => {
+    exportSRT(displaySubtitles);
+  };
+
+  const handleCopy = async () => {
+    await copyBilingual(displaySubtitles);
+  };
+
   return (
     <div className="app-shell">
       <header className="topbar">
@@ -98,8 +107,8 @@ export default function App() {
           {isRunning ? `${sourceMode} stream active` : 'Demo stream ready'}
         </div>
         <div className="top-actions" aria-label="Header actions">
-          <button type="button">Export</button>
-          <button type="button">Copy</button>
+          <button type="button" onClick={handleExport}>Export</button>
+          <button type="button" onClick={handleCopy}>Copy</button>
         </div>
       </header>
 
