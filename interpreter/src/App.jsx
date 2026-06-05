@@ -1,4 +1,16 @@
 import { useEffect, useMemo, useRef, useState } from 'react';
+import {
+  BadgeCheck,
+  Captions,
+  ClipboardCheck,
+  FileAudio,
+  Mic,
+  Radio,
+  Settings,
+  Sparkles,
+  Upload,
+  Wand2,
+} from 'lucide-react';
 import { mockGlossary } from './mock/subtitles.js';
 import {
   isSTTSupported,
@@ -81,6 +93,25 @@ export default function App() {
   const audioRef = useRef(null);
   const displaySubtitles = subtitles;
   const hasSubtitles = displaySubtitles.length > 0;
+  const workflowSteps = buildWorkflowSteps({
+    sourceMode,
+    fileMeta,
+    asrApiKey,
+    apiKey,
+    hasSubtitles,
+    correctionCount,
+  });
+  const nextAction = getNextAction({
+    sourceMode,
+    fileMeta,
+    asrApiKey,
+    apiKey,
+    hasSubtitles,
+    correctionCount,
+    isRunning,
+  });
+  const glossaryHitCount = displaySubtitles.filter((subtitle) => subtitle.termsApplied.length > 0).length;
+  const readinessScore = workflowSteps.filter((step) => step.done).length;
   const selectedSubtitle = useMemo(() => (
     displaySubtitles.find((subtitle) => subtitle.id === selectedSubtitleId)
       ?? displaySubtitles.find((subtitle) => subtitle.isCurrent)
@@ -295,7 +326,10 @@ export default function App() {
             : 'Demo audio stream ready'}
         </div>
         <div className="top-actions" aria-label="Header actions">
-          <button type="button" onClick={() => setSettingsOpen(true)}>Settings</button>
+          <button type="button" onClick={() => setSettingsOpen(true)}>
+            <Settings size={15} />
+            Settings
+          </button>
           <button type="button" disabled={!hasSubtitles} onClick={handleExport}>Export</button>
           <button type="button" disabled={!hasSubtitles} onClick={handleCopy}>Copy</button>
         </div>
@@ -303,6 +337,22 @@ export default function App() {
 
       <main className="workspace">
         <aside className="left-panel" aria-label="Interpreter controls">
+          <section className="panel-block product-guide">
+            <h2>Workflow</h2>
+            <div className="workflow-steps">
+              {workflowSteps.map((step) => (
+                <div className={`workflow-step ${step.done ? 'done' : ''}`} key={step.label}>
+                  <step.icon size={15} />
+                  <span>{step.label}</span>
+                </div>
+              ))}
+            </div>
+            <div className="next-action">
+              <Sparkles size={16} />
+              <span>{nextAction}</span>
+            </div>
+          </section>
+
           <section className="panel-block">
             <h2>Input Source</h2>
             <div className="segmented">
@@ -311,6 +361,7 @@ export default function App() {
                 className={sourceMode === 'demo' ? 'active' : ''}
                 onClick={() => setSourceMode('demo')}
               >
+                <Sparkles size={14} />
                 Demo
               </button>
               <button
@@ -318,6 +369,7 @@ export default function App() {
                 className={sourceMode === 'mic' ? 'active' : ''}
                 onClick={() => setSourceMode('mic')}
               >
+                <Mic size={14} />
                 Mic
               </button>
               <button
@@ -325,6 +377,7 @@ export default function App() {
                 className={sourceMode === 'file' ? 'active' : ''}
                 onClick={() => setSourceMode('file')}
               >
+                <FileAudio size={14} />
                 File
               </button>
               <button
@@ -332,6 +385,7 @@ export default function App() {
                 className={sourceMode === 'live' ? 'active' : ''}
                 onClick={() => setSourceMode('live')}
               >
+                <Radio size={14} />
                 Live
               </button>
             </div>
@@ -357,7 +411,7 @@ export default function App() {
             </div>
             <div className="file-uploader">
               <label>
-                <span>Upload media</span>
+                <span><Upload size={13} /> Upload media</span>
                 <input
                   accept=".mp3,.mp4,.wav,.m4a,.webm,.ogg,audio/*,video/*"
                   type="file"
@@ -524,7 +578,26 @@ export default function App() {
               <button type="button">EN only</button>
             </div>
             <div className="toolbar-note">
-              Latency {latencyMs ? `${(latencyMs / 1000).toFixed(1)}s` : '1.8s'} · Context window 6
+              Latency {latencyMs ? `${(latencyMs / 1000).toFixed(1)}s` : '1.8s'} · Context window {contextWindow}
+            </div>
+          </div>
+
+          <div className="quality-strip" aria-label="Session quality overview">
+            <div>
+              <span>Readiness</span>
+              <strong>{readinessScore}/{workflowSteps.length}</strong>
+            </div>
+            <div>
+              <span>Real Input</span>
+              <strong>{sourceMode === 'file' && asrApiKey ? 'File ASR' : sourceMode === 'mic' ? 'Mic STT' : sourceMode === 'live' ? 'Live capture' : 'Demo'}</strong>
+            </div>
+            <div>
+              <span>Glossary Hits</span>
+              <strong>{glossaryHitCount}</strong>
+            </div>
+            <div>
+              <span>Corrections</span>
+              <strong>{correctionCount}</strong>
             </div>
           </div>
 
@@ -598,12 +671,16 @@ export default function App() {
               value={draftZh}
               onChange={(event) => setDraftZh(event.target.value)}
             />
-            <button type="button" disabled={!hasSelectedSubtitle} onClick={handleSaveCorrection}>Save correction</button>
+            <button type="button" disabled={!hasSelectedSubtitle} onClick={handleSaveCorrection}>
+              <ClipboardCheck size={15} />
+              Save correction
+            </button>
             <button
               type="button"
               disabled={!hasSelectedSubtitle}
               onClick={() => retranslateSubtitle(selectedSubtitle.id)}
             >
+              <Wand2 size={15} />
               Retranslate with glossary
             </button>
           </div>
@@ -726,4 +803,38 @@ function getWaveformLevel(waveformData, index) {
   if (!waveformData.length) return 24 + ((index * 19) % 52);
   const value = waveformData[index % waveformData.length] ?? 0;
   return Math.max(8, Math.round((value / 255) * 70));
+}
+
+function buildWorkflowSteps({ sourceMode, fileMeta, asrApiKey, apiKey, hasSubtitles, correctionCount }) {
+  const inputReady = sourceMode === 'demo'
+    || sourceMode === 'mic'
+    || sourceMode === 'live'
+    || Boolean(fileMeta);
+  const recognitionReady = sourceMode === 'file' ? Boolean(asrApiKey) : true;
+
+  return [
+    { label: 'Input', icon: sourceMode === 'file' ? FileAudio : sourceMode === 'mic' ? Mic : sourceMode === 'live' ? Radio : Sparkles, done: inputReady },
+    { label: 'ASR', icon: Captions, done: recognitionReady },
+    { label: 'Translate', icon: Wand2, done: Boolean(apiKey) || sourceMode === 'demo' || hasSubtitles },
+    { label: 'Correct', icon: BadgeCheck, done: correctionCount > 0 },
+    { label: 'Export', icon: ClipboardCheck, done: hasSubtitles },
+  ];
+}
+
+function getNextAction({
+  sourceMode,
+  fileMeta,
+  asrApiKey,
+  apiKey,
+  hasSubtitles,
+  correctionCount,
+  isRunning,
+}) {
+  if (isRunning) return '正在同传处理中，等待下一条稳定字幕后可修正或导出。';
+  if (sourceMode === 'file' && !fileMeta) return '先上传一段英文音频或视频，再开始真实文件转写。';
+  if (sourceMode === 'file' && !asrApiKey) return '填写 File ASR Key 后，文件模式会走真实音频转写。';
+  if (!apiKey && sourceMode !== 'demo') return '填写翻译 Provider Key 后，ASR 结果会继续生成中文字幕。';
+  if (!hasSubtitles) return '点击 Start Interpreting，开始生成第一批双语字幕。';
+  if (correctionCount === 0) return '点击一条字幕，在 Correction Desk 里保存一次人工修正。';
+  return '当前闭环已跑通，可以导出 SRT 或继续添加术语重译。';
 }
