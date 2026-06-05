@@ -6,9 +6,11 @@
 
 ## 当前阶段
 
-PR-01：项目脚手架初始化。
+PR-03：UI 框架与静态布局。
 
-当前已建立 Vite + React + Tailwind CSS 基础工程，后续功能会按 `../design.md` 的 PR 顺序逐步实现。
+当前已建立 Vite + React + Tailwind CSS 基础工程，并完成同传字幕工作台的静态界面。页面包含输入源选择、Provider 配置、术语表、字幕设置、mock 双语字幕、修正编辑器、底部大字幕和统计栏。
+
+真实 STT、AI 翻译、修正持久化、导出和 Demo 流会按 `../design.md` 的 PR 顺序逐步实现。
 
 ## 快速开始
 
