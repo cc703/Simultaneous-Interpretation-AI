@@ -20,7 +20,7 @@
 已完成一个可运行的同传工作台，包含：
 
 - Demo 模式：无 API Key 也能稳定展示完整同传闭环。
-- File 模式：上传英文音频或视频后，经后端 ASR 转写，再进入中文翻译链路。
+- File 模式：一键加载内置英文样本或上传英文音频/视频后，经 ASR 或明确标注的样本转写文本进入中文翻译链路。
 - Live 模式：捕获标签页或屏幕音频，按音频分片做准实时转写和翻译。
 - 翻译修正：点击字幕后可修改中文译文，并记录到 Correction Memory。
 - 术语表：支持专业词条添加、术语命中和术语重译。
@@ -93,7 +93,7 @@ npm run check:api
 1. 先跑 Demo 模式，证明英文音频流进入后中文字幕逐句出现。
 2. 点击一条字幕，在 Correction Desk 中修改中文译文并保存。
 3. 添加或确认术语，展示术语重译和风险提示。
-4. 切到 File 模式，上传 `interpreter/test-media/sample-english-speech.wav`，展示真实文件 ASR 阶段条。
+4. 切到 File 模式，点击 `Use sample audio`，展示 `File -> ASR -> Translate -> Done` 阶段条。
 5. 切到 Live 模式，展示标签页/屏幕音频捕获、分片统计、静音跳过和重复转写去重。
 6. 点击 Export / Review / Copy，展示 SRT、双语文本和同传复盘报告导出。
 
@@ -153,4 +153,3 @@ npm run smoke:file-asr
 - File / Live 真实 ASR 依赖 Provider、Key、网络和供应商接口能力。
 - Live 模式是几秒级准实时分片，不承诺零延迟。
 - 当前单文件上传建议控制在 25MB 内；DashScope inline 音频建议 10MB 内。
-

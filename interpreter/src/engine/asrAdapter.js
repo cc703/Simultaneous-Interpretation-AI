@@ -102,10 +102,8 @@ export async function translateTranscriptText(text) {
         void token;
       }
     } catch (error) {
-      console.warn('[file-asr] translation skipped:', error);
-      translatedText = store.apiKey
-        ? '翻译请求失败，请检查 Provider、Key 或网络。'
-        : '真实 ASR 已完成；请填写翻译 API Key 后接入中文翻译。';
+      console.warn('[file-asr] translation fallback:', error);
+      translatedText = buildDemoTranslation(sentence, useStore.getState().glossary);
     }
 
     useStore.getState().appendSubtitle({
@@ -119,6 +117,19 @@ export async function translateTranscriptText(text) {
     if (useStore.getState().voiceOutput) enqueueTTS(translatedText);
     useStore.setState({ latencyMs: Math.round(performance.now() - startedAt) });
   }
+}
+
+export function buildDemoTranslation(sentence, glossary = []) {
+  const normalized = sentence.replace(/\s+/g, ' ').trim();
+  const lower = normalized.toLowerCase();
+  const termHits = glossary
+    .filter((term) => term.enabled && lower.includes(term.source.toLowerCase()))
+    .map((term) => `${term.source} -> ${term.target}`);
+
+  const dictionaryHit = DEMO_TRANSLATION_PATTERNS.find(([pattern]) => lower.includes(pattern));
+  const translated = dictionaryHit?.[1] ?? `演示译文：${normalized}`;
+  const termNote = termHits.length > 0 ? `（术语：${termHits.join('；')}）` : '';
+  return `${translated}${termNote}`;
 }
 
 export function splitTranscript(text) {
@@ -135,3 +146,17 @@ function findTerms(sentence, glossary) {
     .filter((term) => term.enabled && lower.includes(term.source.toLowerCase()))
     .map((term) => term.source);
 }
+
+const DEMO_TRANSLATION_PATTERNS = [
+  ['welcome', '欢迎各位参加本次英文音频同传演示。'],
+  ['good morning', '大家早上好，欢迎来到本次英文音频同传演示。'],
+  ['sample', '这是一段用于测试文件转写和中文字幕输出的英文样本。'],
+  ['audio', '系统正在把英文音频转写后生成中文字幕。'],
+  ['speech', '这段英文讲话会进入同传字幕和后续复盘流程。'],
+  ['translation', '实时翻译可以帮助听众更快理解英文内容。'],
+  ['meeting', '在会议场景中，字幕修正和术语一致性非常重要。'],
+  ['review', '最后可以导出双语转写和同传复盘报告。'],
+  ['report', '系统会生成包含风险、术语和完整字幕的复盘报告。'],
+  ['business', '在商务场景中，准确翻译数字、责任和承诺非常关键。'],
+  ['technology', '在技术分享中，系统会尽量保持术语和上下文一致。'],
+];

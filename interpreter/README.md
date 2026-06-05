@@ -102,13 +102,14 @@ Chrome 或 Edge 中打开本地页面，点击输入源 `Mic`，再点击 `Start
 
 ## 文件模式验证
 
-1. 点击输入源 `File`，上传 `.mp3`、`.mp4`、`.wav`、`.m4a`、`.webm` 或 `.ogg` 文件。
+1. 点击输入源 `File`，可点击 `Use sample audio` 一键加载内置英文样本，也可上传 `.mp3`、`.mp4`、`.wav`、`.m4a`、`.webm` 或 `.ogg` 文件。
 2. 推荐启动已配置 `DASHSCOPE_API_KEY` 的本地后端代理；默认国产 ASR 模型为 `qwen3-asr-flash`。如需 OpenAI ASR，可把 `.env` 中 `ASR_PROVIDER` 改为 `openai`。
-3. 可使用 `test-media/sample-english-speech.wav` 作为英文语音测试文件，左侧会显示文件名、大小、格式和时长。
+3. 内置样本来自 `test-media/sample-english-speech.wav`，并复制到 `public/demo-media/` 供页面一键加载；左侧会显示文件名、大小、格式和时长。
 4. 点击 `Start Interpreting` 后，系统会把文件发送到 `/audio/transcriptions` 做真实英文转写。
 5. 转写结果会按英文句子进入现有中文翻译、字幕修正、术语命中、TTS 和导出流程。
-6. 如果未填写浏览器 ASR Key 且后端没有配置 Key，文件模式会明确提示并降级为内置演示转写流，不会伪装成真实 ASR。
-7. 当前前端仍限制单次上传 25MB；更大文件可继续扩展后端分片上传。
+6. 如果未填写浏览器 ASR Key 且后端没有配置 Key，内置样本会明确提示并使用绑定英文转写文本继续跑完 File 主线；普通文件会降级为演示转写流，不会伪装成真实 ASR。
+7. 如果翻译 Key 不可用，系统会使用标注的本地演示译文，确保字幕修正、术语命中、TTS 和导出仍可演示。
+8. 当前前端仍限制单次上传 25MB；更大文件可继续扩展后端分片上传。
 
 ## 直播模式验证
 

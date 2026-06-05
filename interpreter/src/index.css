@@ -394,6 +394,20 @@ button {
   font: 500 12px/1.2 "Noto Sans SC", sans-serif;
 }
 
+.sample-file-button {
+  min-height: 38px;
+  border: 1px solid #aacbc0;
+  border-radius: 6px;
+  color: #ffffff;
+  background: var(--green);
+  font-weight: 850;
+}
+
+.sample-file-button:disabled {
+  cursor: not-allowed;
+  opacity: 0.55;
+}
+
 .file-uploader audio {
   width: 100%;
   height: 38px;

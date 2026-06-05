@@ -42,6 +42,19 @@ import { copyBilingual, exportReviewReport, exportSRT } from './utils/export.js'
 import { buildCorrectionMemory, summarizeQuality } from './utils/quality.js';
 import { getServerHealth } from './engine/serverApi.js';
 
+const SAMPLE_FILE = {
+  name: 'sample-english-speech.wav',
+  type: 'audio/wav',
+  path: '/demo-media/sample-english-speech.wav',
+};
+
+const SAMPLE_TRANSCRIPT = [
+  'Good morning everyone, welcome to our global AI product launch.',
+  'Today we will show how real-time translation reduces the latency budget for online meetings.',
+  'If a phrase is translated incorrectly, the user can correct it immediately.',
+  'At the end, the bilingual transcript can be exported for review.',
+].join(' ');
+
 export default function App() {
   const isRunning = useStore((state) => state.isRunning);
   const latencyMs = useStore((state) => state.latencyMs);
@@ -110,6 +123,7 @@ export default function App() {
   const [fileProgress, setFileProgress] = useState(0);
   const [fileStatus, setFileStatus] = useState('');
   const [fileStage, setFileStage] = useState('idle');
+  const [isSampleLoading, setIsSampleLoading] = useState(false);
   const [liveStatus, setLiveStatus] = useState('');
   const [liveStats, setLiveStats] = useState({ queued: 0, processed: 0, skipped: 0, duplicates: 0 });
   const [serverHealth, setServerHealth] = useState({ ok: false, hasOpenAIKey: false });
@@ -119,11 +133,12 @@ export default function App() {
   const displaySubtitles = subtitles;
   const hasSubtitles = displaySubtitles.length > 0;
   const activeDemoScenario = getDemoScenario(demoScenarioId);
+  const hasServerAsrKey = Boolean(serverHealth.ok && (serverHealth.hasAsrKey ?? serverHealth.hasOpenAIKey));
   const workflowSteps = buildWorkflowSteps({
     sourceMode,
     fileMeta,
     asrApiKey,
-    serverHasApiKey: serverHealth.hasOpenAIKey,
+    serverHasApiKey: hasServerAsrKey,
     apiKey,
     provider,
     hasSubtitles,
@@ -134,7 +149,7 @@ export default function App() {
     fileMeta,
     asrApiKey,
     apiKey,
-    serverHasApiKey: serverHealth.hasOpenAIKey,
+    serverHasApiKey: hasServerAsrKey,
     provider,
     hasSubtitles,
     correctionCount,
@@ -248,9 +263,29 @@ export default function App() {
       return;
     }
 
-    const hasServerAsr = serverHealth.ok && serverHealth.hasOpenAIKey;
+    const hasServerAsr = hasServerAsrKey;
+    const isBundledSample = file.name === SAMPLE_FILE.name;
+    if (!asrApiKey.trim() && !hasServerAsr && isBundledSample) {
+      audioRef.current?.play().catch((error) => console.warn('[file] preview playback failed:', error));
+      useStore.getState().startTranslation();
+      setFileStage('asr');
+      setFileStatus('当前未配置 ASR Key，内置样本使用绑定英文转写文本继续演示 File 主线。');
+      useStore.getState().updateCurrentInterim({
+        en: SAMPLE_FILE.name,
+        zh: '正在读取内置样本英文转写...',
+      });
+      await new Promise((resolve) => setTimeout(resolve, 450));
+      setFileStage('translate');
+      setFileStatus('样本英文转写已就绪，正在生成中文字幕。');
+      await translateTranscriptText(SAMPLE_TRANSCRIPT);
+      setFileStage('done');
+      setFileStatus('File 主线完成：样本音频 -> 英文转写 -> 中文字幕 -> 可修正与导出。');
+      useStore.getState().stopTranslation();
+      return;
+    }
+
     if (!asrApiKey.trim() && !hasServerAsr) {
-      setFileStatus('未填写浏览器 ASR Key，后端也未配置 OPENAI_API_KEY，已降级为演示转写流。');
+      setFileStatus('未填写浏览器 ASR Key，后端也未配置 ASR Key，普通文件已降级为演示转写流。');
       setFileStage('fallback');
       startFileDemoStream(audioRef.current);
       return;
@@ -336,8 +371,7 @@ export default function App() {
     await copyBilingual(displaySubtitles);
   };
 
-  const handleFileChange = (event) => {
-    const file = event.target.files?.[0];
+  const loadFile = (file, status = '') => {
     if (!file) return;
 
     if (fileUrl) URL.revokeObjectURL(fileUrl);
@@ -351,9 +385,37 @@ export default function App() {
       duration: 0,
     });
     setFileProgress(0);
-    setFileStatus('');
+    setFileStatus(status);
     setFileStage('ready');
     setSourceMode('file');
+  };
+
+  const handleFileChange = (event) => {
+    loadFile(event.target.files?.[0]);
+  };
+
+  const handleLoadSampleFile = async () => {
+    if (isRunning || isSampleLoading) return;
+
+    setIsSampleLoading(true);
+    setSourceMode('file');
+    setFileStatus('正在加载内置英文样本...');
+
+    try {
+      const response = await fetch(SAMPLE_FILE.path);
+      if (!response.ok) throw new Error(`样本音频加载失败：${response.status}`);
+      const blob = await response.blob();
+      const file = new File([blob], SAMPLE_FILE.name, {
+        type: blob.type || SAMPLE_FILE.type,
+      });
+      loadFile(file, '已加载内置英文样本。点击 Start Interpreting 进入 ASR -> Translate -> Done。');
+    } catch (error) {
+      console.warn('[file-sample] failed:', error);
+      setFileStage('error');
+      setFileStatus(error.message || '内置英文样本加载失败。');
+    } finally {
+      setIsSampleLoading(false);
+    }
   };
 
   const handleAudioMetadata = () => {
@@ -514,9 +576,9 @@ export default function App() {
               </strong>
               <span>
                 {sourceMode === 'file'
-                  ? (asrApiKey || serverHealth.hasOpenAIKey ? 'Real file ASR enabled · audio transcriptions API' : 'Add ASR key or start local server for real transcription')
+                  ? (asrApiKey || hasServerAsrKey ? 'Real file ASR enabled · audio transcriptions API' : 'Use sample audio for stable demo · add ASR key for real transcription')
                   : sourceMode === 'live'
-                    ? (asrApiKey || serverHealth.hasOpenAIKey ? 'Live ASR chunks enabled · MediaRecorder' : 'Capture audio first · add ASR key or server key')
+                    ? (asrApiKey || hasServerAsrKey ? 'Live ASR chunks enabled · MediaRecorder' : 'Capture audio first · add ASR key or server key')
                   : sourceMode === 'demo'
                   ? 'Built-in English voice + streaming Chinese captions'
                   : (isSTTSupported()
@@ -559,6 +621,15 @@ export default function App() {
             )}
             {sourceMode === 'file' && (
               <div className="file-uploader">
+                <button
+                  className="sample-file-button"
+                  type="button"
+                  disabled={isRunning || isSampleLoading}
+                  onClick={handleLoadSampleFile}
+                >
+                  <FileAudio size={15} />
+                  {isSampleLoading ? 'Loading sample...' : 'Use sample audio'}
+                </button>
                 <label>
                   <span><Upload size={13} /> Upload media</span>
                   <input
@@ -837,7 +908,7 @@ export default function App() {
             </div>
             <div>
               <span>Real Input</span>
-              <strong>{sourceMode === 'file' && (asrApiKey || serverHealth.hasOpenAIKey) ? 'File ASR' : sourceMode === 'mic' ? 'Mic STT' : sourceMode === 'live' ? 'Live capture' : 'Demo'}</strong>
+              <strong>{sourceMode === 'file' && (asrApiKey || hasServerAsrKey) ? 'File ASR' : sourceMode === 'mic' ? 'Mic STT' : sourceMode === 'live' ? 'Live capture' : 'Demo'}</strong>
             </div>
             <div>
               <span>Glossary Hits</span>
@@ -1178,8 +1249,8 @@ function getNextAction({
   isRunning,
 }) {
   if (isRunning) return '正在同传处理中，等待下一条稳定字幕后可修正或导出。';
-  if (sourceMode === 'file' && !fileMeta) return '先上传一段英文音频或视频，再开始真实文件转写。';
-  if (sourceMode === 'file' && !asrApiKey && !serverHasApiKey) return '填写 File ASR Key，或启动带 OPENAI_API_KEY 的后端后，文件模式会走真实音频转写。';
+  if (sourceMode === 'file' && !fileMeta) return '点击 Use sample audio 加载内置英文样本，再开始文件同传主线。';
+  if (sourceMode === 'file' && !asrApiKey && !serverHasApiKey) return '填写 File ASR Key，或启动带 ASR Key 的后端；无 Key 时会明确降级为演示转写流。';
   if (!apiKey && !(provider === 'openai' && serverHasApiKey) && sourceMode !== 'demo') return '填写翻译 Provider Key，或启动带 OPENAI_API_KEY 的后端并选择 OpenAI Provider。';
   if (!hasSubtitles) return '点击 Start Interpreting，开始生成第一批双语字幕。';
   if (correctionCount === 0) return '点击一条字幕，在 Correction Desk 里保存一次人工修正。';

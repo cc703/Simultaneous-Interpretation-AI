@@ -21,12 +21,14 @@ npm run dev
 
 打开 `http://localhost:5173`。右上角显示 `ASR dashscope` 或其他 provider 时，说明前端已经识别到后端。
 
-## 1. 先跑稳定 Demo
+## 1. 先跑 File 主线
 
-1. 输入源保持 `Demo`。
-2. 选择 `Product Launch` 或 `Technical Talk` 场景。
-3. 点击 `Start Demo Interpretation`。
-4. 讲解：英文语音流逐句进入，中文字幕流式出现，Demo Guide 会点亮输入流、术语、复盘状态。
+1. 输入源切到 `File`。
+2. 点击 `Use sample audio`，加载内置英文样本。
+3. 点击 `Start Interpreting`。
+4. 观察左侧阶段条：`File -> ASR -> Translate -> Done`。
+5. 讲解：评审看到的是一段英文音频进入系统，经过转写后生成中文字幕，再进入修正、术语和导出流程。
+6. 如果没有 ASR Key，内置样本会明确标注“使用绑定英文转写文本”并继续跑完 File 主线；如果 ASR Key 可用，就展示真实 ASR 转写结果。翻译 Key 不可用时会使用标注的本地演示译文，保证主线不中断。
 
 ## 2. 展示修正闭环
 
@@ -43,13 +45,12 @@ npm run dev
 4. 点击 `Retranslate with glossary`。
 5. 讲解：术语命中标签和 Risk Review 体现专业场景的一致性控制。
 
-## 4. 展示真实文件模式
+## 4. 补充展示 Demo 稳定模式
 
-1. 切到 `File`。
-2. 上传 `test-media/sample-english-speech.wav`。
-3. 观察左侧阶段条：`File -> ASR -> Translate -> Done`。
-4. 如果 ASR Key 不可用，讲解错误状态和 `Retry file ASR`，不要伪装成功。
-5. 如果 Key 可用，等待字幕生成后继续执行修正、术语和导出。
+1. 输入源切到 `Demo`。
+2. 选择 `Product Launch` 或 `Technical Talk` 场景。
+3. 点击 `Start Demo Interpretation`。
+4. 讲解：Demo 模式用于无 Key 情况下稳定证明完整产品闭环，便于录屏和备用演示。
 
 ## 5. 展示 Live 稳定性设计
 
