@@ -377,7 +377,9 @@ export default function App() {
     <div className="app-shell">
       <header className="topbar">
         <div className="brand">
-          <span className="brand-mark">SI</span>
+          <span className="brand-mark" aria-hidden="true">
+            <img src="/brand-mark.svg" alt="" />
+          </span>
           <div>
             <h1>Simulcast Interpreter</h1>
             <p>Topic 2 · AI 同声传译助手</p>

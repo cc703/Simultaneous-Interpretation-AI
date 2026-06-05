@@ -1,0 +1,65 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="1200" height="630" viewBox="0 0 1200 630" role="img" aria-label="AI simultaneous interpreter project cover">
+  <defs>
+    <linearGradient id="bg" x1="0" x2="1200" y1="0" y2="630" gradientUnits="userSpaceOnUse">
+      <stop stop-color="#080c10"/>
+      <stop offset=".62" stop-color="#0d1318"/>
+      <stop offset="1" stop-color="#10202a"/>
+    </linearGradient>
+    <linearGradient id="line" x1="116" x2="1040" y1="306" y2="306" gradientUnits="userSpaceOnUse">
+      <stop stop-color="#00d4ff"/>
+      <stop offset=".54" stop-color="#00e5a0"/>
+      <stop offset="1" stop-color="#ffb347"/>
+    </linearGradient>
+    <pattern id="grid" width="42" height="42" patternUnits="userSpaceOnUse">
+      <path d="M42 0H0v42" fill="none" stroke="#1e2d3a" stroke-width="1" opacity=".55"/>
+    </pattern>
+    <filter id="glow" x="-20%" y="-20%" width="140%" height="140%">
+      <feGaussianBlur stdDeviation="10" result="blur"/>
+      <feMerge>
+        <feMergeNode in="blur"/>
+        <feMergeNode in="SourceGraphic"/>
+      </feMerge>
+    </filter>
+  </defs>
+  <rect width="1200" height="630" fill="url(#bg)"/>
+  <rect width="1200" height="630" fill="url(#grid)" opacity=".36"/>
+  <path d="M88 514C207 412 265 177 413 182c143 5 149 184 287 194 135 10 199-140 372-94" fill="none" stroke="#00d4ff" stroke-width="2" opacity=".18"/>
+
+  <g transform="translate(82 72)">
+    <rect width="126" height="126" rx="26" fill="#0d1318" stroke="#1e2d3a" stroke-width="3"/>
+    <path d="M24 67h12l7-23 11 56 12-75 12 42h11l7-15 8 15h12" fill="none" stroke="url(#line)" stroke-width="8" stroke-linecap="round" stroke-linejoin="round"/>
+    <path d="M27 95h49" stroke="#00e5a0" stroke-width="7" stroke-linecap="round"/>
+    <path d="M86 95h22" stroke="#7a9bab" stroke-width="7" stroke-linecap="round"/>
+  </g>
+
+  <text x="82" y="260" fill="#e8f4f8" font-family="'Noto Sans SC', 'Microsoft YaHei', sans-serif" font-size="64" font-weight="800">AI 同声传译助手</text>
+  <text x="86" y="318" fill="#7a9bab" font-family="'JetBrains Mono', Consolas, monospace" font-size="25" font-weight="700">Foreign audio stream -> Chinese captions -> correction memory</text>
+  <g transform="translate(86 374)">
+    <rect width="176" height="38" rx="19" fill="#00d4ff" opacity=".15" stroke="#00d4ff" stroke-width="1"/>
+    <text x="25" y="25" fill="#00d4ff" font-family="'Noto Sans SC', 'Microsoft YaHei', sans-serif" font-size="17" font-weight="700">准实时字幕</text>
+    <rect x="196" width="176" height="38" rx="19" fill="#00e5a0" opacity=".14" stroke="#00e5a0" stroke-width="1"/>
+    <text x="221" y="25" fill="#00e5a0" font-family="'Noto Sans SC', 'Microsoft YaHei', sans-serif" font-size="17" font-weight="700">术语命中</text>
+    <rect x="392" width="176" height="38" rx="19" fill="#ffb347" opacity=".14" stroke="#ffb347" stroke-width="1"/>
+    <text x="417" y="25" fill="#ffb347" font-family="'Noto Sans SC', 'Microsoft YaHei', sans-serif" font-size="17" font-weight="700">人工修正</text>
+  </g>
+
+  <g transform="translate(650 78)">
+    <rect width="426" height="438" rx="20" fill="#0d1318" stroke="#1e2d3a" stroke-width="2"/>
+    <rect x="24" y="24" width="378" height="58" rx="10" fill="#101a21" stroke="#1e2d3a"/>
+    <circle cx="54" cy="53" r="10" fill="#00e5a0"/>
+    <rect x="80" y="43" width="178" height="12" rx="6" fill="#7a9bab" opacity=".55"/>
+    <rect x="80" y="61" width="114" height="8" rx="4" fill="#3d5a6b"/>
+    <path d="M40 140h35l14-48 19 130 22-168 20 86h24l13-28 15 28h32l11-35 18 78 17-49h70" fill="none" stroke="url(#line)" stroke-width="8" stroke-linecap="round" stroke-linejoin="round" filter="url(#glow)"/>
+
+    <g transform="translate(24 208)">
+      <rect width="378" height="92" rx="12" fill="#111b22" stroke="#1e2d3a"/>
+      <text x="20" y="34" fill="#7a9bab" font-family="'JetBrains Mono', Consolas, monospace" font-size="14" font-weight="700">00:12 EN</text>
+      <text x="20" y="63" fill="#e8f4f8" font-family="'Noto Sans SC', 'Microsoft YaHei', sans-serif" font-size="21" font-weight="700">We need a strict latency budget.</text>
+    </g>
+    <g transform="translate(24 316)">
+      <rect width="378" height="92" rx="12" fill="#071417" stroke="#00d4ff" stroke-width="2"/>
+      <text x="20" y="34" fill="#00e5a0" font-family="'JetBrains Mono', Consolas, monospace" font-size="14" font-weight="700">ZH OUTPUT</text>
+      <text x="20" y="64" fill="#e8f4f8" font-family="'Noto Sans SC', 'Microsoft YaHei', sans-serif" font-size="24" font-weight="800">我们需要严格的延迟预算。</text>
+    </g>
+  </g>
+</svg>

@@ -82,6 +82,12 @@ button {
   box-shadow: 0 0 24px rgba(0, 212, 255, 0.18);
 }
 
+.brand-mark img {
+  width: 27px;
+  height: 27px;
+  display: block;
+}
+
 .brand h1 {
   margin: 0;
   font: 800 18px/1 "Syne", sans-serif;
