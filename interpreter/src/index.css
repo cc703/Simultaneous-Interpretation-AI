@@ -259,6 +259,16 @@ button {
   white-space: nowrap;
 }
 
+.file-status {
+  padding: 8px 10px;
+  border: 1px solid rgba(0, 229, 160, 0.2);
+  border-radius: 6px;
+  color: var(--green);
+  background: rgba(0, 229, 160, 0.07);
+  font-size: 12px;
+  line-height: 1.5;
+}
+
 .live-capture-card {
   display: grid;
   gap: 9px;

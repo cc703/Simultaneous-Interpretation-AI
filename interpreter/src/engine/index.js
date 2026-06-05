@@ -33,3 +33,7 @@ export {
   setTTSEnabled,
   setTTSRate,
 } from './tts.js';
+export {
+  transcribeAudioFile,
+  translateTranscriptText,
+} from './asrAdapter.js';

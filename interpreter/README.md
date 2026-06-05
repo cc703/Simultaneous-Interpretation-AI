@@ -8,7 +8,7 @@
 
 PR-14：演示材料与提交文案完善。
 
-当前已建立 Vite + React 前端工程，完成同传字幕工作台的静态界面，接入 Web Speech API STT 封装，实现 OpenAI-compatible 流式翻译引擎，完成可演示的翻译修正闭环，加入稳定 Demo 模式，支持文件上传播放驱动时间轴字幕流，支持直播标签页/屏幕音频捕获入口，支持高级设置面板，接入 Web Audio 波形可视化，支持浏览器中文 TTS 播报，并支持导出 SRT / 复制双语文本。页面包含输入源选择、Provider 配置、术语表、字幕设置、时间轴字幕流、修正编辑器、底部大字幕和统计栏。
+当前已建立 Vite + React 前端工程，完成同传字幕工作台的静态界面，接入 Web Speech API STT 封装，实现 OpenAI-compatible 流式翻译引擎，完成可演示的翻译修正闭环，加入稳定 Demo 模式，支持文件上传后调用 OpenAI `/audio/transcriptions` 做真实英文转写，支持直播标签页/屏幕音频捕获入口，支持高级设置面板，接入 Web Audio 波形可视化，支持浏览器中文 TTS 播报，并支持导出 SRT / 复制双语文本。页面包含输入源选择、Provider 配置、File ASR 配置、术语表、字幕设置、时间轴字幕流、修正编辑器、底部大字幕和统计栏。
 
 Demo 视频：待录制，提交前替换为公开可访问链接。
 
@@ -55,10 +55,12 @@ Chrome 或 Edge 中打开本地页面，点击输入源 `Mic`，再点击 `Start
 ## 文件模式验证
 
 1. 点击输入源 `File`，上传 `.mp3`、`.mp4`、`.wav`、`.m4a`、`.webm` 或 `.ogg` 文件。
-2. 左侧会显示文件名、大小、格式和时长。
-3. 点击 `Start Interpreting` 后，文件会自动播放，进度条跟随 `audio.currentTime` 推进。
-4. 当前 MVP 使用内置演示转写流按文件播放进度释放字幕，稳定展示“文件播放 -> 字幕流 -> 修正 -> 导出”闭环。
-5. 这不是任意音频文件的真实 ASR 识别；真实文件音频分片 ASR 会作为后续 ASR Adapter 扩展。
+2. 在 `File ASR` 面板填写 OpenAI ASR Key，默认模型为 `gpt-4o-mini-transcribe`。
+3. 左侧会显示文件名、大小、格式和时长。
+4. 点击 `Start Interpreting` 后，系统会把文件发送到 `/audio/transcriptions` 做真实英文转写。
+5. 转写结果会按英文句子进入现有中文翻译、字幕修正、术语命中、TTS 和导出流程。
+6. 如果未填写 ASR Key，文件模式会明确提示并降级为内置演示转写流，不会伪装成真实 ASR。
+7. 浏览器直传限制为 25MB；更大文件需要后端分片上传。
 
 ## 直播模式验证
 
@@ -96,7 +98,8 @@ Chrome 或 Edge 中打开本地页面，点击输入源 `Mic`，再点击 `Start
 ## 计划功能
 
 - 麦克风英文语音实时识别与中文字幕输出：已完成浏览器 Web Speech API MVP。
-- 文件音频 / Demo 音频按时间轴输出双语字幕：已完成稳定演示流。
+- 文件音频真实 ASR：已完成 OpenAI `/audio/transcriptions` 浏览器直传入口，未填 ASR Key 时降级为稳定演示流。
+- Demo 音频流：已完成英文语音模拟 + 中文流式字幕，用于无 Key 稳定演示。
 - AI 流式翻译：已完成 OpenAI-compatible SSE 引擎与 Provider 配置。
 - 人工修正字幕译文：已完成。
 - 术语表与术语命中：已完成。
@@ -108,9 +111,9 @@ Chrome 或 Edge 中打开本地页面，点击输入源 `Mic`，再点击 `Start
 
 当前作品聚焦比赛题目二要求的“外语音频流实时翻译成中文、字幕/语音输出、翻译修正能力”。为了保证 72 小时内可稳定演示，系统提供三层能力：
 
-- 稳定评审闭环：Demo / File 时间轴转写流可以稳定展示“外语音频流输入 -> 中文字幕输出 -> 人工修正 -> 术语重译 -> TTS 播报 -> 导出”。
-- 真实浏览器能力：Mic 使用 Web Speech API 做英文语音识别；Provider 配置后可走真实 OpenAI-compatible 流式翻译。
-- 扩展入口：Live 已实现系统音频捕获与波形分析，但 Web Speech API 不能直接消费任意系统音频流。任意文件/直播音频的真实 ASR 分片识别需要继续接入 ASR Adapter。
+- 稳定评审闭环：Demo 模式可以在无 Key 情况下稳定展示“外语音频流输入 -> 中文字幕输出 -> 人工修正 -> 术语重译 -> TTS 播报 -> 导出”。
+- 真实浏览器能力：Mic 使用 Web Speech API 做英文语音识别；File 模式可调用 OpenAI ASR 做真实文件转写；Provider 配置后可走真实 OpenAI-compatible 流式翻译。
+- 扩展入口：Live 已实现系统音频捕获与波形分析，但 Web Speech API 不能直接消费任意系统音频流。直播音频的真实 ASR 分片识别仍需继续接入 MediaRecorder + ASR Adapter。
 
 ## 已完成 PR 记录
 
@@ -130,6 +133,6 @@ Chrome 或 Edge 中打开本地页面，点击输入源 `Mic`，再点击 `Start
 
 ## 后续扩展
 
-- 接入 ASR Adapter，将文件音频与直播系统音频切片发送到真实语音识别服务。
+- 将直播系统音频通过 MediaRecorder 切片发送到真实语音识别服务。
 - 增加自动质量评估，例如延迟、漏译率、术语命中率和人工修正前后对比。
 - 提交前录制 Demo 视频，并将公开链接替换到 README 顶部。

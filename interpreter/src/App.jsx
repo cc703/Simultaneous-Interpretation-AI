@@ -11,6 +11,8 @@ import {
   stopAudioAnalyser,
   stopDemoStream,
   stopSTTSession,
+  transcribeAudioFile,
+  translateTranscriptText,
   stopSystemAudioCapture,
   initTTS,
   cancelTTS,
@@ -29,6 +31,9 @@ export default function App() {
   const provider = useStore((state) => state.provider);
   const apiKey = useStore((state) => state.apiKey);
   const baseUrl = useStore((state) => state.baseUrl);
+  const asrApiKey = useStore((state) => state.asrApiKey);
+  const asrBaseUrl = useStore((state) => state.asrBaseUrl);
+  const asrModel = useStore((state) => state.asrModel);
   const targetLanguage = useStore((state) => state.targetLanguage);
   const translationStyle = useStore((state) => state.translationStyle);
   const contextWindow = useStore((state) => state.contextWindow);
@@ -48,6 +53,9 @@ export default function App() {
   const setProvider = useStore((state) => state.setProvider);
   const setApiKey = useStore((state) => state.setApiKey);
   const setBaseUrl = useStore((state) => state.setBaseUrl);
+  const setAsrApiKey = useStore((state) => state.setAsrApiKey);
+  const setAsrBaseUrl = useStore((state) => state.setAsrBaseUrl);
+  const setAsrModel = useStore((state) => state.setAsrModel);
   const setTargetLanguage = useStore((state) => state.setTargetLanguage);
   const setTranslationStyle = useStore((state) => state.setTranslationStyle);
   const setContextWindow = useStore((state) => state.setContextWindow);
@@ -68,6 +76,7 @@ export default function App() {
   const [fileUrl, setFileUrl] = useState('');
   const [fileMeta, setFileMeta] = useState(null);
   const [fileProgress, setFileProgress] = useState(0);
+  const [fileStatus, setFileStatus] = useState('');
   const [settingsOpen, setSettingsOpen] = useState(false);
   const audioRef = useRef(null);
   const displaySubtitles = subtitles;
@@ -111,12 +120,13 @@ export default function App() {
     if (fileUrl) URL.revokeObjectURL(fileUrl);
   }, [fileUrl]);
 
-  const handleRunClick = () => {
+  const handleRunClick = async () => {
     if (isRunning) {
       if (sourceMode === 'demo' || sourceMode === 'file') {
         stopDemoStream();
         stopAudioAnalyser();
         cancelTTS();
+        audioRef.current?.pause();
         useStore.getState().stopTranslation();
       } else {
         stopAudioAnalyser();
@@ -133,11 +143,55 @@ export default function App() {
 
     if (sourceMode === 'file') {
       startElementAnalyser(audioRef.current);
-      startFileDemoStream(audioRef.current);
+      await startFileInterpretation();
       return;
     }
 
     startDemoStream();
+  };
+
+  const startFileInterpretation = async () => {
+    const file = useStore.getState().uploadedFile;
+    if (!file) {
+      setFileStatus('请先上传一个音频或视频文件。');
+      return;
+    }
+
+    if (!asrApiKey.trim()) {
+      setFileStatus('未填写 ASR Key，已降级为演示转写流。');
+      startFileDemoStream(audioRef.current);
+      return;
+    }
+
+    const audio = audioRef.current;
+    audio?.play().catch((error) => console.warn('[file] preview playback failed:', error));
+    useStore.getState().startTranslation();
+    setFileStatus('正在调用真实 ASR 转写文件音频...');
+    useStore.getState().updateCurrentInterim({
+      en: file.name,
+      zh: '正在上传音频并进行英文转写...',
+    });
+
+    try {
+      const transcript = await transcribeAudioFile({
+        file,
+        apiKey: asrApiKey,
+        baseUrl: asrBaseUrl,
+        model: asrModel,
+      });
+      setFileStatus('真实 ASR 转写完成，正在进入中文同传翻译。');
+      await translateTranscriptText(transcript);
+      setFileStatus('文件真实 ASR 与翻译流程完成。');
+    } catch (error) {
+      console.warn('[file-asr] failed:', error);
+      setFileStatus(error.message || '真实 ASR 失败，请检查 Key、模型或网络。');
+      useStore.getState().updateCurrentInterim({
+        en: file.name,
+        zh: error.message || '真实 ASR 失败，请检查 Key、模型或网络。',
+      });
+    } finally {
+      useStore.getState().stopTranslation();
+    }
   };
 
   const handleSaveCorrection = () => {
@@ -186,6 +240,7 @@ export default function App() {
       duration: 0,
     });
     setFileProgress(0);
+    setFileStatus('');
     setSourceMode('file');
   };
 
@@ -290,7 +345,7 @@ export default function App() {
               </strong>
               <span>
                 {sourceMode === 'file'
-                  ? 'File playback drives the same timestamped caption stream'
+                  ? (asrApiKey ? 'Real file ASR enabled · audio transcriptions API' : 'Add ASR key for real file transcription')
                   : sourceMode === 'live'
                     ? 'Captured system audio is ready for ASR adapter expansion'
                   : sourceMode === 'demo'
@@ -316,6 +371,7 @@ export default function App() {
                   <span>{fileMeta.type}</span>
                 </div>
               )}
+              {fileStatus && <div className="file-status">{fileStatus}</div>}
               {fileUrl && (
                 <audio
                   ref={audioRef}
@@ -376,6 +432,36 @@ export default function App() {
               onChange={(event) => setApiKey(event.target.value)}
             />
             <div className="secret-input">API key stays in memory and is not saved to localStorage</div>
+          </section>
+
+          <section className="panel-block">
+            <h2>File ASR</h2>
+            <select
+              className="settings-control"
+              aria-label="ASR model"
+              value={asrModel}
+              onChange={(event) => setAsrModel(event.target.value)}
+            >
+              <option value="gpt-4o-mini-transcribe">gpt-4o-mini-transcribe</option>
+              <option value="gpt-4o-transcribe">gpt-4o-transcribe</option>
+              <option value="whisper-1">whisper-1</option>
+            </select>
+            <input
+              className="settings-control"
+              aria-label="ASR base URL"
+              placeholder="https://api.openai.com/v1"
+              value={asrBaseUrl}
+              onChange={(event) => setAsrBaseUrl(event.target.value)}
+            />
+            <input
+              className="settings-control"
+              aria-label="ASR API key"
+              placeholder="OpenAI ASR key (memory only)"
+              type="password"
+              value={asrApiKey}
+              onChange={(event) => setAsrApiKey(event.target.value)}
+            />
+            <div className="secret-input">File mode uses /audio/transcriptions when this key is present</div>
           </section>
 
           <section className="panel-block">

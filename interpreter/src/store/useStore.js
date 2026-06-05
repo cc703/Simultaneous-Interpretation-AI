@@ -56,6 +56,9 @@ export const useStore = create((set, get) => ({
   provider: savedSettings.provider ?? 'deepseek',
   apiKey: '',
   baseUrl: savedSettings.baseUrl ?? '',
+  asrApiKey: '',
+  asrBaseUrl: savedSettings.asrBaseUrl ?? 'https://api.openai.com/v1',
+  asrModel: savedSettings.asrModel ?? 'gpt-4o-mini-transcribe',
   targetLanguage: savedSettings.targetLanguage ?? 'zh-CN',
   translationStyle: savedSettings.translationStyle ?? 'formal',
   contextWindow: savedSettings.contextWindow ?? 6,
@@ -109,6 +112,15 @@ export const useStore = create((set, get) => ({
     get().persistUserSettings();
   },
   setApiKey: (apiKey) => set({ apiKey }),
+  setAsrApiKey: (asrApiKey) => set({ asrApiKey }),
+  setAsrBaseUrl: (asrBaseUrl) => {
+    set({ asrBaseUrl });
+    get().persistUserSettings();
+  },
+  setAsrModel: (asrModel) => {
+    set({ asrModel });
+    get().persistUserSettings();
+  },
   setBaseUrl: (baseUrl) => {
     set({ baseUrl });
     get().persistUserSettings();
@@ -138,6 +150,8 @@ export const useStore = create((set, get) => ({
     persistSettings({
       provider: state.provider,
       baseUrl: state.baseUrl,
+      asrBaseUrl: state.asrBaseUrl,
+      asrModel: state.asrModel,
       targetLanguage: state.targetLanguage,
       translationStyle: state.translationStyle,
       contextWindow: state.contextWindow,
