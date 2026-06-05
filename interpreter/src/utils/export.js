@@ -10,6 +10,26 @@ export function exportBilingual(subtitles) {
   return content;
 }
 
+export function exportReviewReport({
+  subtitles,
+  glossary,
+  correctionHistory,
+  qualitySummary,
+  sourceMode,
+  provider,
+}) {
+  const content = buildReviewReport({
+    subtitles,
+    glossary,
+    correctionHistory,
+    qualitySummary,
+    sourceMode,
+    provider,
+  });
+  downloadText(`interpretation_review_${Date.now()}.md`, content);
+  return content;
+}
+
 export async function copyBilingual(subtitles) {
   const content = buildBilingualText(subtitles);
   if (navigator.clipboard?.writeText) {
@@ -45,6 +65,71 @@ export function buildBilingualText(subtitles) {
       `ZH: ${subtitle.zh}`,
     ].join('\n'))
     .join('\n\n');
+}
+
+export function buildReviewReport({
+  subtitles,
+  glossary,
+  correctionHistory,
+  qualitySummary,
+  sourceMode,
+  provider,
+}) {
+  const risky = qualitySummary?.risky ?? [];
+  const analyses = qualitySummary?.analyses ?? [];
+  const glossaryHits = qualitySummary?.glossaryHits ?? [];
+  const corrected = qualitySummary?.corrected ?? [];
+
+  return [
+    '# AI 同声传译复盘报告',
+    '',
+    `- 输入模式：${sourceMode}`,
+    `- 翻译 Provider：${provider}`,
+    `- 字幕句数：${subtitles.length}`,
+    `- 风险句数：${risky.length}`,
+    `- 术语命中：${glossaryHits.length}`,
+    `- 人工修正：${corrected.length}`,
+    '',
+    '## 质量诊断',
+    risky.length
+      ? risky.map((item, index) => [
+        `### ${index + 1}. ${item.subtitle.timeLabel}`,
+        `EN: ${item.subtitle.en}`,
+        `ZH: ${item.subtitle.zh}`,
+        `风险：${item.issues.filter((issue) => !issue.positive).map((issue) => `${issue.label} - ${issue.detail}`).join('；')}`,
+      ].join('\n')).join('\n\n')
+      : '暂无高风险字幕。',
+    '',
+    '## 术语表',
+    glossary.length
+      ? glossary.map((term) => `- ${term.source} -> ${term.target}${term.note ? `（${term.note}）` : ''}`).join('\n')
+      : '暂无术语。',
+    '',
+    '## 修正记录',
+    correctionHistory.length
+      ? correctionHistory.map((record, index) => {
+        const subtitle = subtitles.find((item) => item.id === record.subtitleId);
+        return [
+          `### ${index + 1}. ${record.type}`,
+          subtitle?.en ? `EN: ${subtitle.en}` : '',
+          `Before: ${record.beforeZh}`,
+          `After: ${record.afterZh}`,
+          `Reason: ${record.reason}`,
+        ].filter(Boolean).join('\n');
+      }).join('\n\n')
+      : '暂无人工修正记录。',
+    '',
+    '## 完整双语转写',
+    buildBilingualText(subtitles),
+    '',
+    '## 逐句标签',
+    analyses.length
+      ? analyses.map((item, index) => {
+        const labels = item.issues.map((issue) => issue.label).join('、') || '正常';
+        return `- [${index + 1}] ${item.subtitle.timeLabel}：${labels}`;
+      }).join('\n')
+      : '暂无字幕。',
+  ].join('\n');
 }
 
 export function msToSRT(ms) {

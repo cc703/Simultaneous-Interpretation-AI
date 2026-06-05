@@ -37,7 +37,7 @@ import {
   setTTSRate,
 } from './engine/index.js';
 import { useStore } from './store/index.js';
-import { copyBilingual, exportSRT } from './utils/export.js';
+import { copyBilingual, exportReviewReport, exportSRT } from './utils/export.js';
 import { buildCorrectionMemory, summarizeQuality } from './utils/quality.js';
 
 export default function App() {
@@ -269,6 +269,18 @@ export default function App() {
     exportSRT(displaySubtitles);
   };
 
+  const handleExportReview = () => {
+    if (!hasSubtitles) return;
+    exportReviewReport({
+      subtitles: displaySubtitles,
+      glossary,
+      correctionHistory,
+      qualitySummary,
+      sourceMode,
+      provider,
+    });
+  };
+
   const handleCopy = async () => {
     if (!hasSubtitles) return;
     await copyBilingual(displaySubtitles);
@@ -375,6 +387,7 @@ export default function App() {
             Settings
           </button>
           <button type="button" disabled={!hasSubtitles} onClick={handleExport}>Export</button>
+          <button type="button" disabled={!hasSubtitles} onClick={handleExportReview}>Review</button>
           <button type="button" disabled={!hasSubtitles} onClick={handleCopy}>Copy</button>
         </div>
       </header>
