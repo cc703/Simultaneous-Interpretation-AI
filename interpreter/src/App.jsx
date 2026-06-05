@@ -142,6 +142,15 @@ export default function App() {
     () => buildCorrectionMemory(correctionHistory, displaySubtitles),
     [correctionHistory, displaySubtitles],
   );
+  const demoGuideItems = buildDemoGuideItems({
+    sourceMode,
+    activeDemoScenario,
+    hasSubtitles,
+    glossaryHitCount,
+    correctionCount,
+    correctionMemory,
+    qualitySummary,
+  });
   const selectedSubtitle = useMemo(() => (
     displaySubtitles.find((subtitle) => subtitle.id === selectedSubtitleId)
       ?? displaySubtitles.find((subtitle) => subtitle.isCurrent)
@@ -789,6 +798,23 @@ export default function App() {
             </div>
           </div>
 
+          <div className="demo-guide" aria-label="Demo guide">
+            <div className="demo-guide-copy">
+              <span>{sourceMode === 'demo' ? activeDemoScenario.badge : '实测模式'}</span>
+              <strong>{sourceMode === 'demo' ? activeDemoScenario.title : 'Real input interpretation'}</strong>
+              <p>{getDemoGuideHint({ sourceMode, hasSubtitles, correctionCount })}</p>
+            </div>
+            <div className="demo-proof-grid">
+              {demoGuideItems.map((item) => (
+                <div className={item.done ? 'done' : ''} key={item.label}>
+                  <item.icon size={15} />
+                  <span>{item.label}</span>
+                  <strong>{item.value}</strong>
+                </div>
+              ))}
+            </div>
+          </div>
+
           <div className="waveform" aria-label="Audio waveform">
             {Array.from({ length: 36 }).map((_, index) => (
               <span
@@ -1090,6 +1116,50 @@ function getNextAction({
   if (!hasSubtitles) return '点击 Start Interpreting，开始生成第一批双语字幕。';
   if (correctionCount === 0) return '点击一条字幕，在 Correction Desk 里保存一次人工修正。';
   return '当前闭环已跑通，可以导出 SRT 或继续添加术语重译。';
+}
+
+function buildDemoGuideItems({
+  sourceMode,
+  activeDemoScenario,
+  hasSubtitles,
+  glossaryHitCount,
+  correctionCount,
+  correctionMemory,
+  qualitySummary,
+}) {
+  return [
+    {
+      label: '输入流',
+      value: sourceMode === 'demo' ? activeDemoScenario.label : sourceMode,
+      icon: sourceMode === 'demo' ? Sparkles : sourceMode === 'file' ? FileAudio : sourceMode === 'live' ? Radio : Mic,
+      done: hasSubtitles,
+    },
+    {
+      label: '术语',
+      value: glossaryHitCount > 0 ? `${glossaryHitCount} hits` : `${activeDemoScenario.terms.length} ready`,
+      icon: Languages,
+      done: glossaryHitCount > 0,
+    },
+    {
+      label: '修正',
+      value: correctionCount > 0 ? `${correctionCount} saved` : '待修正',
+      icon: BadgeCheck,
+      done: correctionMemory.length > 0,
+    },
+    {
+      label: '复盘',
+      value: hasSubtitles ? `${qualitySummary.riskCount} risks` : '待导出',
+      icon: ClipboardCheck,
+      done: hasSubtitles,
+    },
+  ];
+}
+
+function getDemoGuideHint({ sourceMode, hasSubtitles, correctionCount }) {
+  if (sourceMode !== 'demo') return '真实输入模式会复用同一套字幕、修正、术语和导出工作台。';
+  if (!hasSubtitles) return '先选择一个场景并点击开始，观察英文语音流如何逐句变成中文字幕。';
+  if (correctionCount === 0) return '下一步点击一条字幕，在 Correction Desk 保存一次人工修正。';
+  return '闭环已跑通，可以导出 SRT 或 Review 报告作为演示证据。';
 }
 
 function getRunButtonLabel({ isRunning, sourceMode, isCapturing }) {

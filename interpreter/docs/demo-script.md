@@ -16,8 +16,9 @@ npm run dev
 
 2. 打开 `http://localhost:5173`。
 3. 保持输入源为 `Demo`，不需要 API Key 也能完成稳定演示。
-4. 可选：如果要展示真实流式翻译，在 `Configuration -> Translate` 填写 OpenAI-compatible API Key。
-5. 可选：如果要展示真实文件或直播 ASR，在 `Configuration -> ASR` 填写 OpenAI ASR Key。
+4. 在左侧 Demo 场景中选择一个最适合讲解的预设，例如 `Product Launch`、`Technical Talk` 或 `Business Meeting`。
+5. 可选：如果要展示真实流式翻译，在 `Configuration -> Translate` 填写 OpenAI-compatible API Key。
+6. 可选：如果要展示真实文件或直播 ASR，在 `Configuration -> ASR` 填写 OpenAI ASR Key。
 
 ## 讲解顺序
 
@@ -29,13 +30,15 @@ npm run dev
 
 ### 2. 展示实时字幕流
 
-“我先用 Demo 模式展示稳定评审闭环。点击 Start Interpreting 后，英文发言会按时间轴逐句进入字幕区，而不是一次性显示全部内容。”
+“我先用 Demo 模式展示稳定评审闭环。左侧有三个内置同传场景，切换场景会同步更换英文发言、中文字幕和推荐术语。点击 Start Interpreting 后，英文发言会按时间轴逐句进入字幕区，而不是一次性显示全部内容。”
 
 画面操作：
 
-1. 点击 `Start Interpreting`。
-2. 等待字幕逐条出现。
-3. 指出底部大字幕和右下统计栏会同步变化。
+1. 在 Demo 场景中点选 `Product Launch`、`Technical Talk` 或 `Business Meeting`。
+2. 指出右侧 `Demo Guide` 会显示当前场景、输入流、术语、修正和复盘证明项。
+3. 点击 `Start Interpreting`。
+4. 等待字幕逐条出现。
+5. 指出底部大字幕、质量概览和 Demo Guide 会同步变化。
 
 ### 3. 展示中文语音输出
 
@@ -56,7 +59,7 @@ npm run dev
 1. 点击一条字幕卡片。
 2. 在 `Correction Desk` 修改中文译文。
 3. 点击 `Save correction`。
-4. 展示字幕卡片标记为用户修正，Corrections 计数增加。
+4. 展示字幕卡片标记为用户修正，Corrections 计数增加，右侧 Demo Guide 的“修正”证明项点亮。
 
 ### 5. 展示质量诊断、术语表和重译
 
@@ -68,6 +71,7 @@ npm run dev
 2. 选择包含该词的字幕。
 3. 点击 `Retranslate with glossary`。
 4. 展示术语命中标签、`Risk Review` 和 `Correction Memory`。
+5. 指出 Demo Guide 的“术语”和“复盘”证明项会根据字幕结果更新。
 
 ### 6. 展示文件模式
 
