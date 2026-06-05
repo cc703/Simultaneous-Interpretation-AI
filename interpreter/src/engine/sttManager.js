@@ -1,6 +1,11 @@
 import { useStore } from '../store/index.js';
 import { STTEngine } from './stt.js';
-import { buildContext, buildGlossaryPrompt, streamTranslate } from './translator.js';
+import {
+  buildContext,
+  buildCorrectionMemoryPrompt,
+  buildGlossaryPrompt,
+  streamTranslate,
+} from './translator.js';
 import { cancelTTS, enqueueTTS } from './tts.js';
 
 let sttEngine = null;
@@ -51,6 +56,7 @@ function wireEngineToStore(engine) {
           text,
           context: buildContext(store.subtitles, store.contextWindow),
           glossary: store.terminologyBoost ? buildGlossaryPrompt(store.glossary) : '',
+          correctionMemory: buildCorrectionMemoryPrompt(store.correctionHistory, store.subtitles),
           targetLanguage: store.targetLanguage,
           translationStyle: store.translationStyle,
           provider: store.provider,

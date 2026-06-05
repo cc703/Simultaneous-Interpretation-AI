@@ -1,5 +1,10 @@
 import { useStore } from '../store/index.js';
-import { buildContext, buildGlossaryPrompt, streamTranslate } from './translator.js';
+import {
+  buildContext,
+  buildCorrectionMemoryPrompt,
+  buildGlossaryPrompt,
+  streamTranslate,
+} from './translator.js';
 import { enqueueTTS } from './tts.js';
 
 const MAX_BROWSER_UPLOAD_BYTES = 25 * 1024 * 1024;
@@ -78,6 +83,10 @@ export async function translateTranscriptText(text) {
         text: sentence,
         context: buildContext(useStore.getState().subtitles, store.contextWindow),
         glossary: store.terminologyBoost ? buildGlossaryPrompt(useStore.getState().glossary) : '',
+        correctionMemory: buildCorrectionMemoryPrompt(
+          useStore.getState().correctionHistory,
+          useStore.getState().subtitles,
+        ),
         targetLanguage: store.targetLanguage,
         translationStyle: store.translationStyle,
         provider: store.provider,

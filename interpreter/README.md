@@ -8,7 +8,7 @@
 
 PR-14：演示材料与提交文案完善。
 
-当前已建立 Vite + React 前端工程，完成同传字幕工作台的静态界面，接入 Web Speech API STT 封装，实现 OpenAI-compatible 流式翻译引擎，完成可演示的翻译修正闭环，加入稳定 Demo 模式，支持文件上传后调用 OpenAI `/audio/transcriptions` 做真实英文转写，支持直播标签页/屏幕音频捕获并通过 MediaRecorder 分片送入 ASR，支持高级设置面板，接入 Web Audio 波形可视化，支持浏览器中文 TTS 播报，并支持导出 SRT / 复制双语文本。页面包含输入源选择、Provider 配置、File/Live ASR 配置、术语表、字幕设置、时间轴字幕流、修正编辑器、底部大字幕和统计栏。
+当前已建立 Vite + React 前端工程，完成同传字幕工作台的静态界面，接入 Web Speech API STT 封装，实现 OpenAI-compatible 流式翻译引擎，完成可演示的翻译修正闭环，加入稳定 Demo 模式，支持文件上传后调用 OpenAI `/audio/transcriptions` 做真实英文转写，支持直播标签页/屏幕音频捕获并通过 MediaRecorder 分片送入 ASR，支持高级设置面板，接入 Web Audio 波形可视化，支持浏览器中文 TTS 播报，并支持导出 SRT / 复制双语文本。页面包含输入源选择、Provider 配置、File/Live ASR 配置、术语表、质量诊断、修正记忆、字幕设置、时间轴字幕流、修正编辑器、底部大字幕和统计栏。
 
 Demo 视频：待录制，提交前替换为公开可访问链接。
 
@@ -41,6 +41,8 @@ Chrome 或 Edge 中打开本地页面，点击输入源 `Mic`，再点击 `Start
 3. 点击 `Save correction`，字幕会标记为用户修正，修正计数增加。
 4. 在左侧术语表输入 source 和中文译法，点击 `Add term`。
 5. 点击 `Retranslate with glossary`，命中术语的字幕会标记为术语命中。
+6. 页面会在 `Risk Review` 中提示疑似漏译、术语未命中、占位翻译等风险。
+7. 人工保存过的修正会进入 `Correction Memory`，后续真实翻译 prompt 会参考这些用户确认译文。
 
 ## Demo 模式验证
 
@@ -105,6 +107,7 @@ Chrome 或 Edge 中打开本地页面，点击输入源 `Mic`，再点击 `Start
 - AI 流式翻译：已完成 OpenAI-compatible SSE 引擎与 Provider 配置。
 - 人工修正字幕译文：已完成。
 - 术语表与术语命中：已完成。
+- 质量诊断与修正记忆：已完成，支持风险标签、Risk Review 和用户修正记忆 prompt。
 - 上下文自动重译：已完成术语重译入口，后续可扩展更多上下文策略。
 - SRT / 双语文本导出：已完成。
 - 可选中文 TTS 播报：已完成浏览器原生中文语音输出。
@@ -115,6 +118,7 @@ Chrome 或 Edge 中打开本地页面，点击输入源 `Mic`，再点击 `Start
 
 - 稳定评审闭环：Demo 模式可以在无 Key 情况下稳定展示“外语音频流输入 -> 中文字幕输出 -> 人工修正 -> 术语重译 -> TTS 播报 -> 导出”。
 - 真实浏览器能力：Mic 使用 Web Speech API 做英文语音识别；File 模式可调用 OpenAI ASR 做真实文件转写；Live 模式可通过 MediaRecorder 分片调用 ASR；Provider 配置后可走真实 OpenAI-compatible 流式翻译。
+- 翻译修正能力：人工修正会写入 Correction Memory，并作为后续翻译提示的一部分；Risk Review 会提示漏译、术语未命中和占位翻译。
 - 能力限制：Live ASR 依赖浏览器 MediaRecorder、用户共享音频权限、ASR Key 和网络质量；分片转写不是毫秒级实时，适合 4 秒左右的准实时字幕。
 
 ## 已完成 PR 记录

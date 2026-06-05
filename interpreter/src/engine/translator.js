@@ -35,10 +35,23 @@ export function buildGlossaryPrompt(glossary) {
     .join('\n');
 }
 
+export function buildCorrectionMemoryPrompt(correctionHistory, subtitles) {
+  return correctionHistory
+    .slice(-6)
+    .map((record) => {
+      const subtitle = subtitles.find((item) => item.id === record.subtitleId);
+      if (!subtitle?.en || !record.afterZh) return '';
+      return `EN: ${subtitle.en}\n用户确认译文: ${record.afterZh}`;
+    })
+    .filter(Boolean)
+    .join('\n---\n');
+}
+
 export async function* streamTranslate({
   text,
   context = '',
   glossary = '',
+  correctionMemory = '',
   targetLanguage = 'zh-CN',
   translationStyle = 'formal',
   provider = 'deepseek',
@@ -66,7 +79,7 @@ export async function* streamTranslate({
       stream: true,
       temperature: 0.2,
       messages: [
-        { role: 'system', content: buildSystemPrompt({ context, glossary, targetLanguage, translationStyle }) },
+        { role: 'system', content: buildSystemPrompt({ context, glossary, correctionMemory, targetLanguage, translationStyle }) },
         { role: 'user', content: text },
       ],
     }),
@@ -89,7 +102,13 @@ export function resolveProviderConfig({ provider, baseUrl, model }) {
   };
 }
 
-export function buildSystemPrompt({ context, glossary, targetLanguage = 'zh-CN', translationStyle = 'formal' }) {
+export function buildSystemPrompt({
+  context,
+  glossary,
+  correctionMemory = '',
+  targetLanguage = 'zh-CN',
+  translationStyle = 'formal',
+}) {
   const styleLabel = {
     formal: '正式、适合会议和学术场景',
     casual: '自然口语、适合访谈和直播',
@@ -104,12 +123,16 @@ export function buildSystemPrompt({ context, glossary, targetLanguage = 'zh-CN',
     '2. 保持专业术语准确性。',
     `3. 目标语言：${targetLanguage}。翻译风格：${styleLabel}。`,
     '4. 如果术语表中出现匹配项，必须优先使用指定中文译法。',
+    '5. 如果用户修正记忆中出现相似表达，优先沿用用户确认过的表达方式。',
     '',
     '上下文参考：',
     context || '无',
     '',
     '当前术语表：',
     glossary || '无',
+    '',
+    '用户修正记忆：',
+    correctionMemory || '无',
   ].join('\n');
 }
 

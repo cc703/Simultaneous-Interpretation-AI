@@ -3,6 +3,7 @@ import {
   BadgeCheck,
   Captions,
   ClipboardCheck,
+  AlertTriangle,
   FileAudio,
   Mic,
   Radio,
@@ -35,6 +36,7 @@ import {
 } from './engine/index.js';
 import { useStore } from './store/index.js';
 import { copyBilingual, exportSRT } from './utils/export.js';
+import { buildCorrectionMemory, summarizeQuality } from './utils/quality.js';
 
 export default function App() {
   const isRunning = useStore((state) => state.isRunning);
@@ -62,6 +64,7 @@ export default function App() {
   const subtitles = useStore((state) => state.subtitles);
   const glossary = useStore((state) => state.glossary);
   const correctionCount = useStore((state) => state.correctionCount);
+  const correctionHistory = useStore((state) => state.correctionHistory);
   const selectedSubtitleId = useStore((state) => state.selectedSubtitleId);
   const setSourceMode = useStore((state) => state.setSourceMode);
   const setProvider = useStore((state) => state.setProvider);
@@ -115,6 +118,14 @@ export default function App() {
   });
   const glossaryHitCount = displaySubtitles.filter((subtitle) => subtitle.termsApplied.length > 0).length;
   const readinessScore = workflowSteps.filter((step) => step.done).length;
+  const qualitySummary = useMemo(
+    () => summarizeQuality(displaySubtitles, glossary),
+    [displaySubtitles, glossary],
+  );
+  const correctionMemory = useMemo(
+    () => buildCorrectionMemory(correctionHistory, displaySubtitles),
+    [correctionHistory, displaySubtitles],
+  );
   const selectedSubtitle = useMemo(() => (
     displaySubtitles.find((subtitle) => subtitle.id === selectedSubtitleId)
       ?? displaySubtitles.find((subtitle) => subtitle.isCurrent)
@@ -624,11 +635,11 @@ export default function App() {
             </div>
             <div>
               <span>Glossary Hits</span>
-              <strong>{glossaryHitCount}</strong>
+              <strong>{glossaryHitCount} · {qualitySummary.glossaryHitRate}%</strong>
             </div>
             <div>
-              <span>Corrections</span>
-              <strong>{correctionCount}</strong>
+              <span>Risks</span>
+              <strong>{qualitySummary.riskCount}</strong>
             </div>
           </div>
 
@@ -669,26 +680,47 @@ export default function App() {
               </article>
             )}
             {displaySubtitles.map((subtitle) => (
-              <article
-                className={`subtitle-card ${subtitle.correctionType ?? ''} ${subtitle.id === selectedSubtitle?.id ? 'selected' : ''}`}
+              <SubtitleCard
+                analysis={qualitySummary.analyses.find((item) => item.subtitle.id === subtitle.id)}
+                isSelected={subtitle.id === selectedSubtitle?.id}
                 key={subtitle.id}
-                onClick={() => selectSubtitle(subtitle.id)}
-              >
-                <div className="subtitle-meta">
-                  <time>{subtitle.timeLabel}</time>
-                  {subtitle.correctionType && (
-                    <span>{correctionLabel(subtitle.correctionType)}</span>
-                  )}
-                </div>
-                <p className="source-text">{subtitle.en}</p>
-                <p className="translated-text">{subtitle.zh}</p>
-                {subtitle.termsApplied.length > 0 && (
-                  <div className="term-hits">
-                    {subtitle.termsApplied.map((term) => <code key={term}>{term}</code>)}
-                  </div>
-                )}
-              </article>
+                onSelect={() => selectSubtitle(subtitle.id)}
+                subtitle={subtitle}
+              />
             ))}
+          </div>
+
+          <div className="review-panel">
+            <section>
+              <h2><AlertTriangle size={15} /> Risk Review</h2>
+              {qualitySummary.risky.length === 0 ? (
+                <p className="review-empty">暂无高风险字幕。生成字幕后会自动检查漏译、术语和占位问题。</p>
+              ) : (
+                <div className="review-list">
+                  {qualitySummary.risky.slice(0, 3).map((item) => (
+                    <button type="button" key={item.subtitle.id} onClick={() => selectSubtitle(item.subtitle.id)}>
+                      <strong>{item.subtitle.timeLabel}</strong>
+                      <span>{item.issues.find((issue) => !issue.positive)?.detail}</span>
+                    </button>
+                  ))}
+                </div>
+              )}
+            </section>
+            <section>
+              <h2><BadgeCheck size={15} /> Correction Memory</h2>
+              {correctionMemory.length === 0 ? (
+                <p className="review-empty">保存人工修正后，这里会沉淀为后续翻译参考。</p>
+              ) : (
+                <div className="memory-list">
+                  {correctionMemory.slice(-3).map((record) => (
+                    <div key={record.id}>
+                      <span>{record.en}</span>
+                      <strong>{record.afterZh}</strong>
+                    </div>
+                  ))}
+                </div>
+              )}
+            </section>
           </div>
 
           <div className="correction-editor">
@@ -834,6 +866,36 @@ function getWaveformLevel(waveformData, index) {
   if (!waveformData.length) return 24 + ((index * 19) % 52);
   const value = waveformData[index % waveformData.length] ?? 0;
   return Math.max(8, Math.round((value / 255) * 70));
+}
+
+function SubtitleCard({ subtitle, analysis, isSelected, onSelect }) {
+  const visibleIssues = analysis?.issues ?? [];
+
+  return (
+    <article
+      className={`subtitle-card ${subtitle.correctionType ?? ''} ${isSelected ? 'selected' : ''} ${analysis?.riskLevel === 'risk' ? 'risk' : ''}`}
+      onClick={onSelect}
+    >
+      <div className="subtitle-meta">
+        <time>{subtitle.timeLabel}</time>
+        <div className="subtitle-badges">
+          {subtitle.correctionType && (
+            <span>{correctionLabel(subtitle.correctionType)}</span>
+          )}
+          {visibleIssues.slice(0, 2).map((issue) => (
+            <span className={issue.positive ? 'positive' : 'risk'} key={issue.type}>{issue.label}</span>
+          ))}
+        </div>
+      </div>
+      <p className="source-text">{subtitle.en}</p>
+      <p className="translated-text">{subtitle.zh}</p>
+      {subtitle.termsApplied.length > 0 && (
+        <div className="term-hits">
+          {subtitle.termsApplied.map((term) => <code key={term}>{term}</code>)}
+        </div>
+      )}
+    </article>
+  );
 }
 
 function buildWorkflowSteps({ sourceMode, fileMeta, asrApiKey, apiKey, hasSubtitles, correctionCount }) {
