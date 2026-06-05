@@ -4,6 +4,7 @@ import { useStore } from './store/index.js';
 
 export default function App() {
   const isRunning = useStore((state) => state.isRunning);
+  const latencyMs = useStore((state) => state.latencyMs);
   const currentInterim = useStore((state) => state.currentInterim);
   const liveSubtitles = useStore((state) => state.subtitles);
   const activeSubtitle = mockSubtitles.find((subtitle) => subtitle.isCurrent) ?? mockSubtitles.at(-1);
@@ -110,7 +111,9 @@ export default function App() {
               <button type="button">ZH only</button>
               <button type="button">EN only</button>
             </div>
-            <div className="toolbar-note">Latency 1.8s · Context window 6</div>
+            <div className="toolbar-note">
+              Latency {latencyMs ? `${(latencyMs / 1000).toFixed(1)}s` : '1.8s'} · Context window 6
+            </div>
           </div>
 
           <div className="waveform" aria-label="Audio waveform">

@@ -6,11 +6,11 @@
 
 ## 当前阶段
 
-PR-04：STT 引擎封装。
+PR-05：AI 流式翻译引擎。
 
-当前已建立 Vite + React + Tailwind CSS 基础工程，完成同传字幕工作台的静态界面，并接入 Web Speech API STT 封装。页面包含输入源选择、Provider 配置、术语表、字幕设置、mock 双语字幕、修正编辑器、底部大字幕和统计栏。
+当前已建立 Vite + React + Tailwind CSS 基础工程，完成同传字幕工作台的静态界面，接入 Web Speech API STT 封装，并实现 OpenAI-compatible 流式翻译引擎。页面包含输入源选择、Provider 配置、术语表、字幕设置、mock 双语字幕、修正编辑器、底部大字幕和统计栏。
 
-AI 翻译、修正持久化、导出和 Demo 流会按 `../design.md` 的 PR 顺序逐步实现。
+修正持久化、导出和 Demo 流会按 `../design.md` 的 PR 顺序逐步实现。
 
 ## 快速开始
 
@@ -24,7 +24,11 @@ npm run dev
 
 ## STT 验证
 
-Chrome 或 Edge 中打开本地页面，点击 `Start Interpreting` 后授权麦克风。说英文时，当前识别中的英文会显示在字幕区；完整句 final 后会生成一条字幕，中文位置暂显示“等待翻译引擎接入...”。真实中文翻译将在后续 PR-05 接入。
+Chrome 或 Edge 中打开本地页面，点击 `Start Interpreting` 后授权麦克风。说英文时，当前识别中的英文会显示在字幕区；完整句 final 后会进入翻译管线。未填写 API Key 时会显示明确的占位提示，后续设置面板会提供 Key 输入。
+
+## 翻译验证
+
+当前翻译引擎支持 OpenAI-compatible SSE 流式响应，默认 Provider 为 DeepSeek。填写 API Key 的 UI 会在后续设置 PR 中接入；目前引擎代码已完成，未填写 Key 时会明确显示“等待填写 API Key 后接入实时中文翻译”，不会伪装成真实翻译成功。
 
 ## 计划功能
 

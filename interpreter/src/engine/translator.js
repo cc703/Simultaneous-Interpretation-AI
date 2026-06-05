@@ -1,0 +1,139 @@
+export const PROVIDER_CONFIGS = {
+  deepseek: {
+    baseUrl: 'https://api.deepseek.com/v1',
+    model: 'deepseek-chat',
+    protocol: 'openai',
+  },
+  openai: {
+    baseUrl: 'https://api.openai.com/v1',
+    model: 'gpt-4o-mini',
+    protocol: 'openai',
+  },
+  claude: {
+    baseUrl: 'https://api.anthropic.com/v1',
+    model: 'claude-haiku-4-5-20251001',
+    protocol: 'anthropic',
+  },
+  custom: {
+    baseUrl: '',
+    model: 'gpt-3.5-turbo',
+    protocol: 'openai',
+  },
+};
+
+export function buildContext(subtitles, windowSize = 6) {
+  return subtitles
+    .slice(-windowSize)
+    .map((subtitle) => `EN: ${subtitle.en}\nZH: ${subtitle.zh}`)
+    .join('\n---\n');
+}
+
+export function buildGlossaryPrompt(glossary) {
+  return glossary
+    .filter((term) => term.enabled)
+    .map((term) => `${term.source} => ${term.target}${term.note ? ` (${term.note})` : ''}`)
+    .join('\n');
+}
+
+export async function* streamTranslate({
+  text,
+  context = '',
+  glossary = '',
+  provider = 'deepseek',
+  apiKey = '',
+  baseUrl = '',
+  model,
+  onToken,
+}) {
+  const config = resolveProviderConfig({ provider, baseUrl, model });
+  if (!apiKey) {
+    throw new Error('Missing API key for translation provider.');
+  }
+  if (config.protocol !== 'openai') {
+    throw new Error('This browser client currently supports OpenAI-compatible streaming only.');
+  }
+
+  const response = await fetch(`${config.baseUrl.replace(/\/$/, '')}/chat/completions`, {
+    method: 'POST',
+    headers: {
+      Authorization: `Bearer ${apiKey}`,
+      'Content-Type': 'application/json',
+    },
+    body: JSON.stringify({
+      model: config.model,
+      stream: true,
+      temperature: 0.2,
+      messages: [
+        { role: 'system', content: buildSystemPrompt({ context, glossary }) },
+        { role: 'user', content: text },
+      ],
+    }),
+  });
+
+  if (!response.ok) {
+    const detail = await response.text().catch(() => '');
+    throw new Error(`Translation request failed: ${response.status} ${detail}`);
+  }
+
+  yield* parseOpenAIStream(response, onToken);
+}
+
+export function resolveProviderConfig({ provider, baseUrl, model }) {
+  const preset = PROVIDER_CONFIGS[provider] ?? PROVIDER_CONFIGS.deepseek;
+  return {
+    ...preset,
+    baseUrl: provider === 'custom' ? baseUrl : preset.baseUrl,
+    model: model || preset.model,
+  };
+}
+
+export function buildSystemPrompt({ context, glossary }) {
+  return [
+    '你是一名专业同声传译员。将用户提供的英文片段翻译成自然流畅的中文。',
+    '',
+    '规则：',
+    '1. 直接输出译文，不加任何解释或前缀。',
+    '2. 保持专业术语准确性。',
+    '3. 根据上下文调整语气，适配会议、课堂、发布会和技术分享场景。',
+    '4. 如果术语表中出现匹配项，必须优先使用指定中文译法。',
+    '',
+    '上下文参考：',
+    context || '无',
+    '',
+    '当前术语表：',
+    glossary || '无',
+  ].join('\n');
+}
+
+async function* parseOpenAIStream(response, onToken) {
+  const reader = response.body.getReader();
+  const decoder = new TextDecoder();
+  let buffer = '';
+
+  while (true) {
+    const { done, value } = await reader.read();
+    if (done) break;
+
+    buffer += decoder.decode(value, { stream: true });
+    const lines = buffer.split('\n');
+    buffer = lines.pop() ?? '';
+
+    for (const rawLine of lines) {
+      const line = rawLine.trim();
+      if (!line.startsWith('data: ')) continue;
+      const payload = line.slice(6);
+      if (payload === '[DONE]') return;
+
+      try {
+        const json = JSON.parse(payload);
+        const token = json.choices?.[0]?.delta?.content ?? '';
+        if (token) {
+          onToken?.(token);
+          yield token;
+        }
+      } catch (error) {
+        console.warn('[translator] failed to parse stream chunk:', error);
+      }
+    }
+  }
+}
