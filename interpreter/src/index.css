@@ -1705,7 +1705,7 @@ body {
 }
 
 .right-panel {
-  grid-template-rows: auto 70px 3px minmax(260px, 1fr) auto auto 42px;
+  grid-template-rows: auto auto auto minmax(260px, 1fr) auto auto 42px;
   background: rgba(7, 10, 18, 0.55);
 }
 
@@ -1838,7 +1838,7 @@ body {
   }
 
   .right-panel {
-    grid-template-rows: auto 56px 3px minmax(260px, 50vh) auto auto auto;
+    grid-template-rows: auto auto auto minmax(260px, 50vh) auto auto auto;
   }
 
   .language-route {

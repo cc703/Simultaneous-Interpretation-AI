@@ -108,7 +108,7 @@ const UI_COPY = {
     ready: '待开始',
     readyBadge: '等待输入',
     readySource: 'Click Start Interpreting to play or capture English audio.',
-    readyZh: '选择文件或直播源后点击开始，系统会生成中文字幕。',
+    readyZh: '选择文件或直播源后点击开始，字幕会按时间逐句出现。',
     recognizing: '识别中',
     correction: '翻译修正',
     saveCorrection: '保存修正',
@@ -156,7 +156,7 @@ const UI_COPY = {
     ready: 'Ready',
     readyBadge: 'Waiting',
     readySource: 'Click Start Interpreting to play or capture English audio.',
-    readyZh: 'Select a file or live source, then start to generate Chinese captions.',
+    readyZh: 'Select a file or live source, then captions will appear line by line.',
     recognizing: 'Recognizing',
     correction: 'Correction',
     saveCorrection: 'Save',
@@ -259,6 +259,8 @@ export default function App() {
   const activeDemoScenario = getDemoScenario(demoScenarioId);
   const hasServerAsrKey = Boolean(serverHealth.ok && (serverHealth.hasAsrKey ?? serverHealth.hasOpenAIKey));
   const hasLiveAsr = Boolean(asrApiKey.trim() || hasServerAsrKey);
+  const hasSignal = isRunning || isCapturing || currentInterim.en || hasSubtitles || fileProgress > 0;
+  const showSubtitlePreview = showBanner && (isRunning || currentInterim.en || hasSubtitles);
   const nextAction = getNextAction({
     sourceMode,
     fileMeta,
@@ -881,18 +883,22 @@ export default function App() {
             </div>
           </div>
 
-          <div className="waveform" aria-label="Audio waveform">
-            {Array.from({ length: 36 }).map((_, index) => (
-              <span
-                // eslint-disable-next-line react/no-array-index-key
-                key={index}
-                style={{ '--level': `${getWaveformLevel(waveformData, index)}%` }}
-              />
-            ))}
-          </div>
-          <div className="progress-track">
-            <span style={{ width: sourceMode === 'file' ? `${Math.round(fileProgress * 100)}%` : undefined }} />
-          </div>
+          {hasSignal && (
+            <>
+              <div className="waveform" aria-label="Audio waveform">
+                {Array.from({ length: 36 }).map((_, index) => (
+                  <span
+                    // eslint-disable-next-line react/no-array-index-key
+                    key={index}
+                    style={{ '--level': `${getWaveformLevel(waveformData, index)}%` }}
+                  />
+                ))}
+              </div>
+              <div className="progress-track">
+                <span style={{ width: sourceMode === 'file' ? `${Math.round(fileProgress * 100)}%` : undefined }} />
+              </div>
+            </>
+          )}
 
           <div className="subtitle-scroll">
             {displaySubtitles.length === 0 && !currentInterim.en && (
@@ -938,32 +944,33 @@ export default function App() {
             ))}
           </div>
 
-          <div className="correction-editor">
-            <div>
-              <h2>{copy.correction}</h2>
-              <p>{selectedSubtitle.en}</p>
+          {hasSelectedSubtitle && (
+            <div className="correction-editor">
+              <div>
+                <h2>{copy.correction}</h2>
+                <p>{selectedSubtitle.en}</p>
+              </div>
+              <textarea
+                className="editor-preview"
+                aria-label="Corrected Chinese subtitle"
+                value={draftZh}
+                onChange={(event) => setDraftZh(event.target.value)}
+              />
+              <button type="button" onClick={handleSaveCorrection}>
+                <ClipboardCheck size={15} />
+                {copy.saveCorrection}
+              </button>
+              <button
+                type="button"
+                onClick={() => retranslateSubtitle(selectedSubtitle.id)}
+              >
+                <Wand2 size={15} />
+                {copy.retranslate}
+              </button>
             </div>
-            <textarea
-              className="editor-preview"
-              aria-label="Corrected Chinese subtitle"
-              value={draftZh}
-              onChange={(event) => setDraftZh(event.target.value)}
-            />
-            <button type="button" disabled={!hasSelectedSubtitle} onClick={handleSaveCorrection}>
-              <ClipboardCheck size={15} />
-              {copy.saveCorrection}
-            </button>
-            <button
-              type="button"
-              disabled={!hasSelectedSubtitle}
-              onClick={() => retranslateSubtitle(selectedSubtitle.id)}
-            >
-              <Wand2 size={15} />
-              {copy.retranslate}
-            </button>
-          </div>
+          )}
 
-          {showBanner && (
+          {showSubtitlePreview && (
             <div className="subtitle-banner">
               <span>{subtitleMode === 'en-only' ? copy.sourceOnly : copy.targetOnly}</span>
               <strong>{subtitleMode === 'en-only' ? (currentInterim.en || selectedSubtitle.en) : (currentInterim.zh || selectedSubtitle.zh)}</strong>
