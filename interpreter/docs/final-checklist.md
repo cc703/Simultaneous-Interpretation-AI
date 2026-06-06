@@ -5,32 +5,44 @@
 ## 本地运行
 
 - [ ] 执行 `cd interpreter && npm install`
-- [ ] 执行 `npm run dev`
-- [ ] 浏览器打开 `http://localhost:5173`
-- [ ] 执行 `npm test` 通过
+- [ ] 执行 `npm run dev:server`
+- [ ] 另开终端执行 `npm run dev -- --host 127.0.0.1`
+- [ ] 浏览器打开 `http://127.0.0.1:5173`
+- [ ] 右上角显示 `AI 引擎在线 · dashscope`
 - [ ] 执行 `npm run build` 通过
+- [ ] 执行 `npm test` 通过
+- [ ] 执行 `npm run check:api` 通过
+- [ ] 执行 `npm run smoke:file-asr` 通过
+- [ ] 执行 `npm run smoke:media` 通过
+- [ ] 执行 `npm run smoke:gateway-boundaries` 通过
+- [ ] 执行 `npm run smoke:final` 通过，并生成 `docs/final-closure-smoke.md`
 
 ## 核心演示链路
 
-- [ ] Demo 模式无需 Key，点击 `Start Demo Interpretation` 后字幕按时间流动。
-- [ ] 打开 `Chinese voice output` 后，中文字幕可被浏览器语音播报。
-- [ ] 点击字幕，修改中文，点击 `Save correction`，字幕显示用户修正。
-- [ ] `Risk Review` 能显示质量风险或空状态说明。
-- [ ] `Correction Memory` 能显示最近人工修正。
-- [ ] `Configuration -> Terms` 可新增术语，并通过 `Retranslate with glossary` 应用。
-- [ ] 顶部 `Bilingual` / `ZH only` / `EN only` 切换有效。
-- [ ] `Export` 下载 SRT。
-- [ ] `Review` 下载 Markdown 复盘报告。
-- [ ] `Copy` 复制双语文本，或在剪贴板不可用时降级下载文本。
+- [ ] File 模式点击 `加载样本` 后，点击 `开始同传` 能生成目标语言字幕。
+- [ ] File 模式上传英文音频后，走 `ASR -> 翻译 -> 字幕`。
+- [ ] File 模式上传英文视频后，先提取音轨再转写。
+- [ ] File 模式上传音乐/无语音音频后，明确提示无可转写语音，不生成假字幕。
+- [ ] Demo 模式作为兜底，点击 `开始同传` 后字幕按时间流动。
+- [ ] 打开语音输出后，字幕可被浏览器按目标语言播报。
+- [ ] 点击字幕，修改目标语言译文，点击 `保存修正`，字幕显示用户修正。
+- [ ] 保存修正后，修正计数增加，后续翻译可引用修正记忆。
+- [ ] `设置 -> 术语` 可新增术语，并通过 `术语重译` 应用。
+- [ ] 顶部 `双语` / `目标语言` / `检测语言` 切换有效。
+- [ ] 源语言可选择，默认 `自动检测`；目标语言可选择。
+- [ ] 空闲状态不显示假波形，不显示不可用修正区。
+- [ ] `导出` 下载 SRT。
+- [ ] `复制` 复制双语文本，或在剪贴板不可用时降级下载文本。
 
 ## 真实能力验证
 
 - [ ] Mic 模式在 Chrome / Edge 下可请求麦克风权限。
 - [ ] File 模式上传 25MB 以内英文音频/视频后，填写 `DASHSCOPE_API_KEY` 可通过 `/api/transcribe` 调用真实 ASR。
-- [ ] File 模式未填写 ASR Key 时，页面明确提示降级为演示转写流。
-- [ ] Live 模式可通过 `Choose tab audio` 请求标签页/屏幕音频。
-- [ ] Live 模式填写 ASR Key 后会显示 Live ASR 分片状态。
+- [ ] File 模式未填写 ASR Key 时，页面明确提示配置缺口，不伪装真实转写。
+- [ ] Live 模式可通过 `选择直播音频` 请求标签页/屏幕音频。
+- [ ] Live 模式填写 ASR Key 后会显示 Source、Permission、ASR、Queued、Done、Silent、Dup、Latency。
 - [ ] 停止 Live 捕获后音频 track 被释放，状态不再继续转写。
+- [ ] Live 只处理音频，不做画面理解。
 
 ## 文案边界
 
@@ -39,10 +51,11 @@
 - [ ] 不声称直播是毫秒级无延迟同传。
 - [ ] 不声称前端可无限制处理任意大小文件。
 - [ ] 说明 API Key 仅保存在内存，不写入 localStorage。
+- [ ] `.env`、API Key、日志和 `ui.txt` 不进入仓库。
 
 ## 提交材料
 
 - [ ] GitHub/Gitee 仓库公开可访问。
 - [ ] README 包含运行方式、功能说明、能力边界和 Demo 视频链接。
 - [ ] Demo 视频有声音讲解。
-- [ ] Demo 视频展示：输入源 -> 实时字幕 -> 修正 -> 术语 -> 语音播报 -> 导出。
+- [ ] Demo 视频展示：File 输入 -> 语言路由 -> 实时字幕 -> 修正 -> 术语 -> Live 展示 -> 导出。
