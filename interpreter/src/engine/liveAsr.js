@@ -4,10 +4,14 @@ import { transcribeAudioBlob, translateTranscriptText } from './asrAdapter.js';
 let recorder = null;
 let chunkIndex = 0;
 let active = false;
-let processing = Promise.resolve();
 let stats = { queued: 0, processed: 0, skipped: 0, duplicates: 0, lastLatencyMs: 0 };
 let lastTranscript = '';
 let sessionId = 0;
+let isProcessing = false;
+let pendingChunk = null;
+
+const DEFAULT_CHUNK_MS = 1000;
+const SILENCE_BYTES_THRESHOLD = 700;
 
 export function isLiveASRSupported() {
   return typeof window !== 'undefined' && 'MediaRecorder' in window;
@@ -17,7 +21,7 @@ export function startLiveASR(stream, {
   apiKey,
   baseUrl,
   model,
-  chunkMs = 4000,
+  chunkMs = DEFAULT_CHUNK_MS,
   onStatus,
   onStats,
 } = {}) {
@@ -34,22 +38,23 @@ export function startLiveASR(stream, {
   chunkIndex = 0;
   stats = { queued: 0, processed: 0, skipped: 0, duplicates: 0, lastLatencyMs: 0 };
   lastTranscript = '';
+  isProcessing = false;
+  pendingChunk = null;
   useStore.getState().startTranslation();
   emitStats(onStats);
-  onStatus?.('Live ASR 已启动，正在按音频片段转写。');
+  onStatus?.('Live ASR 低延迟模式已启动，正在按 1 秒级音频片段转写。');
 
   recorder.ondataavailable = (event) => {
     if (!active || !event.data) return;
     const index = ++chunkIndex;
-    if (event.data.size < 1200) {
+    if (event.data.size < SILENCE_BYTES_THRESHOLD) {
       stats.skipped += 1;
       emitStats(onStats);
       onStatus?.(`直播片段 #${index} 过短或静音，已跳过。`);
       return;
     }
-    stats.queued += 1;
-    emitStats(onStats);
-    processing = processing.then(() => processChunk(event.data, {
+    scheduleChunk({
+      blob: event.data,
       index,
       sessionId: currentSessionId,
       apiKey,
@@ -57,7 +62,8 @@ export function startLiveASR(stream, {
       model,
       onStatus,
       onStats,
-    }));
+      queuedAt: performance.now(),
+    });
   };
 
   recorder.onerror = (event) => {
@@ -68,25 +74,61 @@ export function startLiveASR(stream, {
     active = false;
   };
 
-  recorder.start(Number(chunkMs) || 4000);
+  recorder.start(normalizeChunkMs(chunkMs));
 }
 
 export function stopLiveASR() {
   active = false;
   sessionId += 1;
+  isProcessing = false;
+  pendingChunk = null;
   if (recorder && recorder.state !== 'inactive') {
     recorder.stop();
   }
   recorder = null;
 }
 
-async function processChunk(blob, { index, sessionId: chunkSessionId, apiKey, baseUrl, model, onStatus, onStats }) {
+function scheduleChunk(job) {
+  if (!active || !isCurrentSession(job.sessionId)) return;
+  if (isProcessing) {
+    if (pendingChunk) stats.skipped += 1;
+    pendingChunk = job;
+    emitStats(job.onStats);
+    job.onStatus?.(`直播片段 #${job.index} 已进入低延迟缓冲；旧缓冲片段会被跳过。`);
+    return;
+  }
+
+  void processChunkLoop(job);
+}
+
+async function processChunkLoop(initialJob) {
+  let job = initialJob;
+  isProcessing = true;
+  try {
+    while (job && active && isCurrentSession(job.sessionId)) {
+      await processChunk(job);
+      job = pendingChunk;
+      pendingChunk = null;
+    }
+  } finally {
+    isProcessing = false;
+    if (pendingChunk && active && isCurrentSession(pendingChunk.sessionId)) {
+      const nextJob = pendingChunk;
+      pendingChunk = null;
+      void processChunkLoop(nextJob);
+    }
+  }
+}
+
+async function processChunk({ blob, index, sessionId: chunkSessionId, apiKey, baseUrl, model, onStatus, onStats, queuedAt }) {
   if (!isCurrentSession(chunkSessionId)) return;
   const startedAt = performance.now();
+  stats.queued += 1;
+  emitStats(onStats);
   onStatus?.(`正在转写直播片段 #${index}...`);
   useStore.getState().updateCurrentInterim({
     en: `Live chunk #${index}`,
-    zh: '正在对直播音频做真实 ASR...',
+    zh: '正在低延迟转写直播音频...',
   });
 
   try {
@@ -106,12 +148,16 @@ async function processChunk(blob, { index, sessionId: chunkSessionId, apiKey, ba
       return;
     }
     lastTranscript = transcript;
-    stats.processed += 1;
-    stats.lastLatencyMs = Math.round(performance.now() - startedAt);
+    const asrLatencyMs = Math.round(performance.now() - (queuedAt ?? startedAt));
     emitStats(onStats);
-    onStatus?.(`直播片段 #${index} 已转写，正在翻译。`);
+    onStatus?.(`直播片段 #${index} 已转写，ASR 耗时 ${asrLatencyMs}ms，正在翻译。`);
     if (!isCurrentSession(chunkSessionId)) return;
     await translateTranscriptText(transcript);
+    if (!isCurrentSession(chunkSessionId)) return;
+    stats.processed += 1;
+    stats.lastLatencyMs = Math.round(performance.now() - (queuedAt ?? startedAt));
+    emitStats(onStats);
+    onStatus?.(`直播片段 #${index} 字幕已生成，端到端片段处理耗时 ${stats.lastLatencyMs}ms。`);
   } catch (error) {
     if (!isCurrentSession(chunkSessionId)) return;
     console.warn('[live-asr] chunk failed:', error);
@@ -157,4 +203,10 @@ function normalizeTranscript(text) {
     .replace(/[^\p{L}\p{N}]+/gu, ' ')
     .replace(/\s+/g, ' ')
     .trim();
+}
+
+function normalizeChunkMs(chunkMs) {
+  const next = Number(chunkMs);
+  if (!Number.isFinite(next)) return DEFAULT_CHUNK_MS;
+  return Math.max(1000, Math.min(10000, Math.round(next)));
 }

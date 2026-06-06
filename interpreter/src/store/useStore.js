@@ -64,7 +64,7 @@ export const useStore = create((set, get) => ({
   targetLanguage: savedSettings.targetLanguage ?? 'zh-CN',
   translationStyle: savedSettings.translationStyle ?? 'formal',
   contextWindow: savedSettings.contextWindow ?? 6,
-  chunkSeconds: savedSettings.chunkSeconds ?? 4,
+  chunkSeconds: savedSettings.chunkSeconds ?? 1,
   terminologyBoost: savedSettings.terminologyBoost ?? true,
 
   // 运行状态
@@ -145,7 +145,8 @@ export const useStore = create((set, get) => ({
     get().persistUserSettings();
   },
   setChunkSeconds: (chunkSeconds) => {
-    set({ chunkSeconds: Number(chunkSeconds) });
+    const nextChunkSeconds = Math.max(1, Math.min(10, Number(chunkSeconds) || 1));
+    set({ chunkSeconds: nextChunkSeconds });
     get().persistUserSettings();
   },
   setTerminologyBoost: (terminologyBoost) => {

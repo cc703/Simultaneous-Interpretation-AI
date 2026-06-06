@@ -96,7 +96,7 @@ npm run dev -- --host 127.0.0.1
 
 ### 7. 展示直播捕获和分片 ASR
 
-“Live 模式可以捕获浏览器标签页或屏幕音频。启动配置了 DASHSCOPE_API_KEY 的本地后端代理后，系统会使用 MediaRecorder 按分片长度持续转写直播音频，再送入目标语言翻译链路。”
+“Live 模式可以捕获浏览器标签页或屏幕音频。启动配置了 DASHSCOPE_API_KEY 的本地后端代理后，系统会使用 MediaRecorder 按 1 秒低延迟分片持续转写直播音频，再送入目标语言翻译链路。”
 
 画面操作：
 
@@ -107,7 +107,7 @@ npm run dev -- --host 127.0.0.1
 5. 展示 Source、Permission、ASR、Queued、Done、Silent、Dup、Latency 和 `停止直播捕获`。
 6. 点击顶部 `浮窗`，打开字幕浮窗，再切回直播/会议页面，说明用户可以在原媒体页面上方观看同传字幕，不必回到工作台看字幕。
 
-边界说明：“Live 依赖浏览器共享音频权限、MediaRecorder、ASR Key 和网络质量；它只处理音频，不做画面理解；字幕浮窗依赖浏览器 Picture-in-Picture 或弹出窗口，不直接改第三方直播网页；属于几秒级准实时分片转写。”
+边界说明：“Live 依赖浏览器共享音频权限、MediaRecorder、ASR Key 和网络质量；它只处理音频，不做画面理解；字幕浮窗依赖浏览器 Picture-in-Picture 或弹出窗口，不直接改第三方直播网页；当前默认 1 秒低延迟分片，处理耗时按毫秒展示，但不承诺零延迟。”
 
 ### 8. 展示导出
 
@@ -141,5 +141,5 @@ npm run dev -- --host 127.0.0.1
 - 不要说“Live 能理解视频画面内容”。
 - 不要说“系统会直接改写第三方直播网页 DOM”。
 - 可以说“文件模式支持通过本地 Gateway 调用百炼 Qwen-ASR，当前前端上传限制为 25MB，DashScope inline 音频建议控制在 10MB 内”。
-- 可以说“直播模式支持 MediaRecorder 分片 ASR，属于几秒级准实时字幕”。
+- 可以说“直播模式支持 MediaRecorder 1 秒低延迟分片 ASR，处理耗时按毫秒展示；端到端延迟仍受模型和网络影响”。
 - 可以说“Demo 模式用于保证评审时稳定展示题目要求的完整产品闭环”。

@@ -121,7 +121,7 @@ const UI_COPY = {
     corrections: '修正',
     glossary: '术语',
     provider: '引擎',
-    liveBoundary: 'Live 为几秒级准实时分片；无 ASR Key 时只显示捕获状态，不生成假字幕。',
+    liveBoundary: 'Live 默认 1 秒低延迟分片；处理耗时按毫秒统计，但端到端仍受 ASR、翻译和网络影响。',
     liveUse: '适用于网页直播、社交直播、媒体直播和线上会议。',
     overlayHint: '打开字幕浮窗后，可以切到直播/会议页面观看，字幕会继续同步。',
     advancedSettings: '高级设置',
@@ -173,7 +173,7 @@ const UI_COPY = {
     corrections: 'Corrections',
     glossary: 'Glossary',
     provider: 'Provider',
-    liveBoundary: 'Live uses short near-real-time chunks. Without ASR credentials, it shows capture state only.',
+    liveBoundary: 'Live defaults to 1s low-latency chunks. Processing is tracked in milliseconds, while end-to-end delay still depends on ASR, translation, and network.',
     liveUse: 'For web streams, social live rooms, media streams, and online meetings.',
     overlayHint: 'Open the caption overlay, then switch back to the stream tab. Captions keep syncing.',
     advancedSettings: 'Advanced settings',
@@ -1252,9 +1252,9 @@ export default function App() {
               />
             </label>
             <label>
-              <span>音频分片长度：{chunkSeconds}s</span>
-              <input
-                min="2"
+                <span>音频分片长度：{chunkSeconds}s（低延迟建议 1s）</span>
+                <input
+                min="1"
                 max="10"
                 type="number"
                 value={chunkSeconds}
