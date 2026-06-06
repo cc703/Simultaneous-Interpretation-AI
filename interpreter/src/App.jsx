@@ -65,6 +65,16 @@ const TARGET_LANGUAGES = [
   { value: 'es', zh: '西班牙文', en: 'Spanish' },
 ];
 
+const SOURCE_LANGUAGES = [
+  { value: 'auto', zh: '自动检测', en: 'Auto detect' },
+  { value: 'en', zh: '英文', en: 'English' },
+  { value: 'zh-CN', zh: '中文', en: 'Chinese' },
+  { value: 'ja', zh: '日文', en: 'Japanese' },
+  { value: 'ko', zh: '韩文', en: 'Korean' },
+  { value: 'fr', zh: '法文', en: 'French' },
+  { value: 'es', zh: '西班牙文', en: 'Spanish' },
+];
+
 const UI_COPY = {
   zh: {
     productSubtitle: '题目二 · AI 同声传译助手',
@@ -177,6 +187,7 @@ export default function App() {
   const asrApiKey = useStore((state) => state.asrApiKey);
   const asrBaseUrl = useStore((state) => state.asrBaseUrl);
   const asrModel = useStore((state) => state.asrModel);
+  const sourceLanguage = useStore((state) => state.sourceLanguage);
   const targetLanguage = useStore((state) => state.targetLanguage);
   const translationStyle = useStore((state) => state.translationStyle);
   const contextWindow = useStore((state) => state.contextWindow);
@@ -205,6 +216,7 @@ export default function App() {
   const setAsrApiKey = useStore((state) => state.setAsrApiKey);
   const setAsrBaseUrl = useStore((state) => state.setAsrBaseUrl);
   const setAsrModel = useStore((state) => state.setAsrModel);
+  const setSourceLanguage = useStore((state) => state.setSourceLanguage);
   const setTargetLanguage = useStore((state) => state.setTargetLanguage);
   const setTranslationStyle = useStore((state) => state.setTranslationStyle);
   const setContextWindow = useStore((state) => state.setContextWindow);
@@ -813,10 +825,19 @@ export default function App() {
               <strong>{sourceMode === 'file' ? copy.file : sourceMode === 'live' ? copy.live : sourceMode === 'mic' ? copy.mic : copy.demo}</strong>
             </div>
             <div className="language-route" aria-label="Language route">
-              <div>
+              <label>
                 <span>{copy.sourceLanguage}</span>
-                <strong>{copy.autoDetect}</strong>
-              </div>
+                <select
+                  value={sourceLanguage}
+                  onChange={(event) => setSourceLanguage(event.target.value)}
+                >
+                  {SOURCE_LANGUAGES.map((language) => (
+                    <option key={language.value} value={language.value}>
+                      {language[uiLanguage]}
+                    </option>
+                  ))}
+                </select>
+              </label>
               <span aria-hidden="true">→</span>
               <label>
                 <span>{copy.targetLanguage}</span>
@@ -1097,6 +1118,16 @@ export default function App() {
                 </div>
               </div>
             )}
+            <label>
+              <span>{copy.sourceLanguage}</span>
+              <select value={sourceLanguage} onChange={(event) => setSourceLanguage(event.target.value)}>
+                {SOURCE_LANGUAGES.map((language) => (
+                  <option key={language.value} value={language.value}>
+                    {language[uiLanguage]}
+                  </option>
+                ))}
+              </select>
+            </label>
             <label>
               <span>{copy.targetLanguage}</span>
               <select value={targetLanguage} onChange={(event) => setTargetLanguage(event.target.value)}>

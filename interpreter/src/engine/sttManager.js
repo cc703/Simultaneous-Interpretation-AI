@@ -59,6 +59,7 @@ function wireEngineToStore(engine) {
           correctionMemory: store.autoCorrect
             ? buildCorrectionMemoryPrompt(store.correctionHistory, store.subtitles)
             : '',
+          sourceLanguage: store.sourceLanguage,
           targetLanguage: store.targetLanguage,
           translationStyle: store.translationStyle,
           provider: store.provider,

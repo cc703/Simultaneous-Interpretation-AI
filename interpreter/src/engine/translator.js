@@ -52,6 +52,7 @@ export async function* streamTranslate({
   context = '',
   glossary = '',
   correctionMemory = '',
+  sourceLanguage = 'auto',
   targetLanguage = 'zh-CN',
   translationStyle = 'formal',
   provider = 'openai',
@@ -80,7 +81,7 @@ export async function* streamTranslate({
       stream: true,
       temperature: 0.2,
       messages: [
-        { role: 'system', content: buildSystemPrompt({ context, glossary, correctionMemory, targetLanguage, translationStyle }) },
+        { role: 'system', content: buildSystemPrompt({ context, glossary, correctionMemory, sourceLanguage, targetLanguage, translationStyle }) },
         { role: 'user', content: text },
       ],
     }),
@@ -107,6 +108,7 @@ export function buildSystemPrompt({
   context,
   glossary,
   correctionMemory = '',
+  sourceLanguage = 'auto',
   targetLanguage = 'zh-CN',
   translationStyle = 'formal',
 }) {
@@ -116,8 +118,12 @@ export function buildSystemPrompt({
     technical: '技术准确、适合产品发布和工程分享',
   }[translationStyle] ?? translationStyle;
 
+  const sourceInstruction = sourceLanguage === 'auto'
+    ? '自动判断用户输入片段的源语言。'
+    : `用户选择的源语言是 ${sourceLanguage}；如音频内容明显不符，可结合上下文纠正。`;
+
   return [
-    '你是一名专业同声传译员。自动判断用户输入片段的源语言，并翻译成目标语言。',
+    `你是一名专业同声传译员。${sourceInstruction}请翻译成目标语言。`,
     '',
     '规则：',
     '1. 直接输出译文，不加任何解释或前缀。',

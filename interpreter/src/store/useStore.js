@@ -60,6 +60,7 @@ export const useStore = create((set, get) => ({
   asrApiKey: '',
   asrBaseUrl: savedSettings.asrBaseUrl ?? 'https://api.openai.com/v1',
   asrModel: savedSettings.asrModel ?? 'gpt-4o-mini-transcribe',
+  sourceLanguage: savedSettings.sourceLanguage ?? 'auto',
   targetLanguage: savedSettings.targetLanguage ?? 'zh-CN',
   translationStyle: savedSettings.translationStyle ?? 'formal',
   contextWindow: savedSettings.contextWindow ?? 6,
@@ -123,6 +124,10 @@ export const useStore = create((set, get) => ({
     set({ asrModel });
     get().persistUserSettings();
   },
+  setSourceLanguage: (sourceLanguage) => {
+    set({ sourceLanguage });
+    get().persistUserSettings();
+  },
   setBaseUrl: (baseUrl) => {
     set({ baseUrl });
     get().persistUserSettings();
@@ -154,6 +159,7 @@ export const useStore = create((set, get) => ({
       baseUrl: state.baseUrl,
       asrBaseUrl: state.asrBaseUrl,
       asrModel: state.asrModel,
+      sourceLanguage: state.sourceLanguage,
       targetLanguage: state.targetLanguage,
       translationStyle: state.translationStyle,
       contextWindow: state.contextWindow,

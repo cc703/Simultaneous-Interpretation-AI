@@ -92,6 +92,7 @@ export async function translateTranscriptText(text) {
             useStore.getState().subtitles,
           )
           : '',
+        sourceLanguage: store.sourceLanguage,
         targetLanguage: store.targetLanguage,
         translationStyle: store.translationStyle,
         provider: store.provider,
