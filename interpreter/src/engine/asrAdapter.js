@@ -61,6 +61,9 @@ export async function transcribeAudioBlob({
   }
 
   const json = await response.json();
+  if (json.speechDetected === false) {
+    throw new Error(json.note || 'ASR 未检测到清晰英文语音。');
+  }
   const text = json.text?.trim();
   if (!text) throw new Error('ASR 未返回可用英文文本。');
   return text;

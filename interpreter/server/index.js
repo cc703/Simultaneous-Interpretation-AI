@@ -1,4 +1,8 @@
 import http from 'node:http';
+import { mkdtemp, readFile, rm, writeFile } from 'node:fs/promises';
+import { tmpdir } from 'node:os';
+import { join } from 'node:path';
+import { spawn } from 'node:child_process';
 
 const DEFAULT_PORT = 8787;
 const OPENAI_BASE_URL = readEnv('OPENAI_BASE_URL', 'https://api.openai.com/v1');
@@ -221,7 +225,20 @@ async function proxyDashScopeTranscription({ body, contentType, response }) {
     return;
   }
 
-  if (parsed.file.length > DASHSCOPE_MAX_AUDIO_BYTES) {
+  let media;
+  try {
+    media = await normalizeDashScopeMedia(parsed);
+  } catch (error) {
+    sendError(response, 422, {
+      error: error.message || 'Failed to extract audio from video media.',
+      code: 'video_audio_extract_failed',
+      purpose: 'asr',
+      provider: 'dashscope',
+    });
+    return;
+  }
+
+  if (media.file.length > DASHSCOPE_MAX_AUDIO_BYTES) {
     sendError(response, 413, {
       error: 'DashScope Qwen-ASR inline audio limit is 10MB. Use a shorter sample or switch to an object-storage URL workflow.',
       code: 'file_too_large',
@@ -232,8 +249,8 @@ async function proxyDashScopeTranscription({ body, contentType, response }) {
     return;
   }
 
-  const dataUrl = `data:${parsed.contentType};base64,${parsed.file.toString('base64')}`;
-  const audioFormat = inferAudioFormat(parsed.contentType);
+  const dataUrl = `data:${media.contentType};base64,${media.file.toString('base64')}`;
+  const audioFormat = inferAudioFormat(media.contentType);
   let upstream;
   try {
     upstream = await fetch(`${DASHSCOPE_ASR_BASE_URL.replace(/\/$/, '')}/chat/completions`, {
@@ -297,16 +314,72 @@ async function proxyDashScopeTranscription({ body, contentType, response }) {
 
   const text = extractDashScopeAsrText(payload);
   if (!text) {
-    sendError(response, 502, {
-      error: `DashScope ASR returned no text: ${bodyText.slice(0, 240)}`,
-      code: 'asr_empty_response',
-      purpose: 'asr',
-      provider: 'dashscope',
+    sendJson(response, 200, {
+      text: '',
+      speechDetected: false,
+      note: 'DashScope ASR returned no speech text. This usually means the media has no clear speech.',
     });
     return;
   }
 
-  sendJson(response, 200, { text });
+  sendJson(response, 200, { text, speechDetected: true });
+}
+
+async function normalizeDashScopeMedia(parsed) {
+  if (!isVideoContent(parsed.contentType)) return parsed;
+  const extracted = await extractAudioToWav(parsed.file);
+  return {
+    file: extracted,
+    contentType: 'audio/wav',
+  };
+}
+
+function isVideoContent(contentType) {
+  return contentType.toLowerCase().startsWith('video/');
+}
+
+async function extractAudioToWav(file) {
+  const dir = await mkdtemp(join(tmpdir(), 'interpreter-asr-'));
+  const input = join(dir, 'input.media');
+  const output = join(dir, 'audio.wav');
+  try {
+    await writeFile(input, file);
+    await runProcess('ffmpeg', [
+      '-y',
+      '-hide_banner',
+      '-loglevel',
+      'error',
+      '-i',
+      input,
+      '-vn',
+      '-ar',
+      '16000',
+      '-ac',
+      '1',
+      '-f',
+      'wav',
+      output,
+    ]);
+    return await readFile(output);
+  } finally {
+    await rm(dir, { recursive: true, force: true });
+  }
+}
+
+function runProcess(command, args) {
+  return new Promise((resolve, reject) => {
+    const child = spawn(command, args, { windowsHide: true });
+    const stderr = [];
+    child.stderr.on('data', (chunk) => stderr.push(chunk));
+    child.on('error', reject);
+    child.on('close', (code) => {
+      if (code === 0) {
+        resolve();
+        return;
+      }
+      reject(new Error(`${command} exited with ${code}: ${Buffer.concat(stderr).toString('utf8')}`));
+    });
+  });
 }
 
 function extractDashScopeAsrText(payload) {
