@@ -20,10 +20,12 @@ Node AI Gateway
   - 统一错误边界
         |
         v
-DashScope / OpenAI / OpenAI-compatible providers
+DashScope Bailian / OpenAI / OpenAI-compatible providers
 ```
 
-Gateway 不做用户系统、数据库、长期存储或字幕业务逻辑。字幕、修正记忆、术语和导出都保留在前端工作台内，Gateway 只负责模型访问。
+Gateway 不做用户系统、数据库、长期存储或字幕业务逻辑。字幕、修正记忆、术语和导出都保留在前端工作台内，Gateway 只负责模型访问。默认情况下，阿里云百炼 DashScope 同时作为翻译和 ASR Provider。
+
+百炼 API Key 配置步骤见 `docs/dashscope-bailian-setup.md`。
 
 ## 接口
 
@@ -40,9 +42,9 @@ Gateway 不做用户系统、数据库、长期存储或字幕业务逻辑。字
   "hasTranslationKey": true,
   "hasAsrKey": true,
   "asrProvider": "dashscope",
-  "translationModel": "gpt-4o-mini",
+  "translationModel": "qwen-plus",
   "asrModel": "qwen3-asr-flash",
-  "translationBaseUrl": "https://api.openai.com/v1",
+  "translationBaseUrl": "https://dashscope.aliyuncs.com/compatible-mode/v1",
   "asrBaseUrl": "https://dashscope.aliyuncs.com/compatible-mode/v1"
 }
 ```
@@ -79,7 +81,7 @@ Provider 策略：
 
 ```json
 {
-  "model": "gpt-4o-mini",
+  "model": "qwen-plus",
   "messages": []
 }
 ```
@@ -93,18 +95,19 @@ Provider 策略：
 ```env
 PORT=8787
 
-OPENAI_BASE_URL=https://api.openai.com/v1
-OPENAI_API_KEY=
-
-OPENAI_TRANSLATION_BASE_URL=https://api.openai.com/v1
-OPENAI_TRANSLATION_API_KEY=
-OPENAI_TRANSLATION_MODEL=gpt-4o-mini
+DASHSCOPE_API_KEY=
+DASHSCOPE_BASE_URL=https://dashscope.aliyuncs.com/compatible-mode/v1
+DASHSCOPE_TRANSLATION_MODEL=qwen-plus
 
 ASR_PROVIDER=dashscope
-
-DASHSCOPE_API_KEY=
 DASHSCOPE_ASR_BASE_URL=https://dashscope.aliyuncs.com/compatible-mode/v1
 DASHSCOPE_ASR_MODEL=qwen3-asr-flash
+
+OPENAI_BASE_URL=https://api.openai.com/v1
+OPENAI_API_KEY=
+OPENAI_TRANSLATION_BASE_URL=
+OPENAI_TRANSLATION_API_KEY=
+OPENAI_TRANSLATION_MODEL=
 
 OPENAI_ASR_BASE_URL=https://api.openai.com/v1
 OPENAI_ASR_API_KEY=
@@ -113,7 +116,7 @@ OPENAI_ASR_MODEL=gpt-4o-mini-transcribe
 
 Key 优先级：
 
-- 翻译：`OPENAI_TRANSLATION_API_KEY` 优先，缺省回退到 `OPENAI_API_KEY`。
+- 翻译：`OPENAI_TRANSLATION_API_KEY` 优先，缺省回退到 `DASHSCOPE_API_KEY`，再回退到 `OPENAI_API_KEY`。
 - OpenAI ASR：`OPENAI_ASR_API_KEY` 优先，缺省回退到 `OPENAI_API_KEY`。
 - DashScope ASR：`DASHSCOPE_API_KEY` 优先，缺省回退到 `OPENAI_ASR_API_KEY`。
 
@@ -151,4 +154,3 @@ Gateway 返回统一 JSON 错误，前端可以用 `code` 判断状态。
 - Live 是几秒级音频分片 ASR，不承诺零延迟。
 - 没有 ASR Key 时，Live 不生成假字幕；File 内置样本会明确标注使用绑定转写文本。
 - API Key 不写入前端持久化存储；服务端 Key 只来自 `.env`。
-

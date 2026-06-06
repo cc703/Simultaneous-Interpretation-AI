@@ -54,7 +54,7 @@ export const useStore = create((set, get) => ({
   demoEnabled: false,
 
   // AI Provider 配置
-  provider: savedSettings.provider ?? 'deepseek',
+  provider: savedSettings.provider ?? 'openai',
   apiKey: '',
   baseUrl: savedSettings.baseUrl ?? '',
   asrApiKey: '',

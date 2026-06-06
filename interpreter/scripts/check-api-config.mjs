@@ -1,5 +1,5 @@
 const baseUrls = [
-  ['translation', readEnv('OPENAI_TRANSLATION_BASE_URL', readEnv('OPENAI_BASE_URL', 'https://api.openai.com/v1'))],
+  ['translation', getTranslationBaseUrl()],
   ['asr', getAsrBaseUrl()],
 ];
 
@@ -24,8 +24,19 @@ for (const [name, baseUrl] of baseUrls) {
 function buildHeaders(name) {
   const apiKey = name === 'asr'
     ? getAsrApiKey()
-    : readEnv('OPENAI_TRANSLATION_API_KEY', readEnv('OPENAI_API_KEY', ''));
+    : getTranslationApiKey();
   return apiKey ? { Authorization: `Bearer ${apiKey}` } : {};
+}
+
+function getTranslationBaseUrl() {
+  return readEnv(
+    'OPENAI_TRANSLATION_BASE_URL',
+    readEnv('DASHSCOPE_TRANSLATION_BASE_URL', readEnv('DASHSCOPE_BASE_URL', readEnv('OPENAI_BASE_URL', 'https://dashscope.aliyuncs.com/compatible-mode/v1'))),
+  );
+}
+
+function getTranslationApiKey() {
+  return readEnv('OPENAI_TRANSLATION_API_KEY', readEnv('DASHSCOPE_TRANSLATION_API_KEY', readEnv('DASHSCOPE_API_KEY', readEnv('OPENAI_API_KEY', ''))));
 }
 
 function getAsrBaseUrl() {

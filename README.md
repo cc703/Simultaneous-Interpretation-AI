@@ -64,22 +64,23 @@ Vite 会把 `/api/*` 请求转发到本地后端 `http://localhost:8787`。
 
 ## API 配置
 
-项目支持把翻译和语音识别分开配置。默认 ASR Provider 使用阿里云百炼 DashScope Qwen-ASR，也保留 OpenAI-compatible ASR 入口。
+项目支持把翻译和语音识别分开配置。默认优先使用阿里云百炼 DashScope：`qwen-plus` 负责中文翻译，`qwen3-asr-flash` 负责英文 ASR，也保留 OpenAI-compatible 自定义入口。
 
 后端不是业务后台，而是轻量 AI Gateway：负责 Key 隔离、ASR Provider 适配、翻译 Provider 适配和统一错误边界。前端继续负责输入源、字幕、修正、术语和导出。详见 [轻量 AI Gateway 设计](interpreter/docs/backend-gateway.md)。
 
 `.env` 示例：
 
 ```env
-OPENAI_TRANSLATION_BASE_URL=https://your-chat-compatible.example/v1
-OPENAI_TRANSLATION_API_KEY=你的聊天网关Key
-OPENAI_TRANSLATION_MODEL=gpt-4o-mini
-
-ASR_PROVIDER=dashscope
 DASHSCOPE_API_KEY=你的阿里云百炼DashScope Key
+DASHSCOPE_BASE_URL=https://dashscope.aliyuncs.com/compatible-mode/v1
+DASHSCOPE_TRANSLATION_MODEL=qwen-plus
+ASR_PROVIDER=dashscope
 DASHSCOPE_ASR_BASE_URL=https://dashscope.aliyuncs.com/compatible-mode/v1
 DASHSCOPE_ASR_MODEL=qwen3-asr-flash
 ```
+
+也就是说，如果你使用百炼免费额度，通常只需要复制 `.env.example` 为 `.env`，然后填写 `DASHSCOPE_API_KEY`。
+前端默认 Provider 为 `Server Gateway`，会通过本地 `/api/translate` 使用 `.env` 中的百炼 Key。
 
 检查当前接口配置：
 
@@ -105,6 +106,7 @@ npm run check:api
 - [录屏讲解脚本](interpreter/docs/demo-script.md)
 - [文件 ASR 烟测说明](interpreter/docs/file-asr-smoke.md)
 - [轻量 AI Gateway 设计](interpreter/docs/backend-gateway.md)
+- [阿里云百炼 DashScope API 配置](interpreter/docs/dashscope-bailian-setup.md)
 
 ## 验证命令
 

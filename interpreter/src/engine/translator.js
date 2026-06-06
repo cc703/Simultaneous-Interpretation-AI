@@ -54,7 +54,7 @@ export async function* streamTranslate({
   correctionMemory = '',
   targetLanguage = 'zh-CN',
   translationStyle = 'formal',
-  provider = 'deepseek',
+  provider = 'openai',
   apiKey = '',
   baseUrl = '',
   model,
@@ -95,7 +95,7 @@ export async function* streamTranslate({
 }
 
 export function resolveProviderConfig({ provider, baseUrl, model }) {
-  const preset = PROVIDER_CONFIGS[provider] ?? PROVIDER_CONFIGS.deepseek;
+  const preset = PROVIDER_CONFIGS[provider] ?? PROVIDER_CONFIGS.openai;
   return {
     ...preset,
     baseUrl: provider === 'custom' ? baseUrl : preset.baseUrl,

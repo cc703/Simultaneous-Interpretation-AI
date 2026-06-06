@@ -20,6 +20,8 @@ Demo 视频：待录制，提交前替换为公开可访问链接。
 
 轻量 AI Gateway 设计见 `docs/backend-gateway.md`。
 
+阿里云百炼 DashScope 配置见 `docs/dashscope-bailian-setup.md`。
+
 视觉系统与页面层级设计见 `docs/visual-system.md`。
 
 ## 快速开始
@@ -43,19 +45,20 @@ npm run dev:server
 
 然后另开一个终端运行 `npm run dev`。Vite 会把 `/api/*` 转发到 `http://localhost:8787`。未启动后端时，Demo 模式仍可完整演示；填写浏览器内存 Key 时也可以继续走浏览器直连。
 
-如果使用第三方 OpenAI-compatible 网关，建议把翻译和 ASR 分开配置。默认 ASR Provider 使用国产阿里云百炼 DashScope Qwen-ASR：
+如果使用阿里云百炼免费额度，默认可以让同一个 `DASHSCOPE_API_KEY` 同时驱动翻译和 ASR。当前默认翻译模型为 `qwen-plus`，默认 ASR 模型为 `qwen3-asr-flash`：
 
 ```env
-OPENAI_TRANSLATION_BASE_URL=https://your-chat-compatible.example/v1
-OPENAI_TRANSLATION_API_KEY=你的聊天网关Key
-
-ASR_PROVIDER=dashscope
 DASHSCOPE_API_KEY=你的阿里云百炼DashScope Key
+DASHSCOPE_BASE_URL=https://dashscope.aliyuncs.com/compatible-mode/v1
+DASHSCOPE_TRANSLATION_MODEL=qwen-plus
+ASR_PROVIDER=dashscope
 DASHSCOPE_ASR_BASE_URL=https://dashscope.aliyuncs.com/compatible-mode/v1
 DASHSCOPE_ASR_MODEL=qwen3-asr-flash
 ```
 
-很多第三方聊天网关只支持 `/chat/completions`，不支持语音转写。可用以下命令检查当前 `.env` 的接口可达性：
+如需换成 OpenAI 或其他 OpenAI-compatible 网关，可再填写 `OPENAI_TRANSLATION_BASE_URL`、`OPENAI_TRANSLATION_API_KEY`、`OPENAI_TRANSLATION_MODEL` 等覆盖项。很多第三方聊天网关只支持 `/chat/completions`，不支持语音转写。可用以下命令检查当前 `.env` 的接口可达性：
+
+前端默认翻译 Provider 为 `Server Gateway`，因此不需要在浏览器里填写 Key；启动本地后端后会自动通过 `/api/translate` 使用 `.env` 中的百炼 Key。
 
 ```bash
 npm run check:api

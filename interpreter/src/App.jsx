@@ -755,7 +755,7 @@ export default function App() {
                   onChange={(event) => setProvider(event.target.value)}
                 >
                   <option value="deepseek">DeepSeek</option>
-                  <option value="openai">OpenAI</option>
+                  <option value="openai">Server Gateway</option>
                   <option value="custom">Custom</option>
                 </select>
                 {provider === 'custom' && (
@@ -776,7 +776,7 @@ export default function App() {
                   onChange={(event) => setApiKey(event.target.value)}
                 />
                 <div className="secret-input">
-                  Browser key stays in memory. OpenAI can also use the local server proxy.
+                  Browser key stays in memory. Server Gateway uses DashScope/OpenAI-compatible keys from .env.
                 </div>
               </div>
             )}
@@ -1304,7 +1304,7 @@ function getNextAction({
   if (isRunning) return '正在同传处理中，等待下一条稳定字幕后可修正或导出。';
   if (sourceMode === 'file' && !fileMeta) return '点击 Use sample audio 加载内置英文样本，再开始文件同传主线。';
   if (sourceMode === 'file' && !asrApiKey && !serverHasApiKey) return '填写 File ASR Key，或启动带 ASR Key 的后端；无 Key 时会明确降级为演示转写流。';
-  if (!apiKey && !(provider === 'openai' && serverHasApiKey) && sourceMode !== 'demo') return '填写翻译 Provider Key，或启动带 OPENAI_API_KEY 的后端并选择 OpenAI Provider。';
+  if (!apiKey && !(provider === 'openai' && serverHasApiKey) && sourceMode !== 'demo') return '填写翻译 Provider Key，或启动带 DASHSCOPE_API_KEY 的后端并选择 Server Gateway。';
   if (!hasSubtitles) return '点击 Start Interpreting，开始生成第一批双语字幕。';
   if (correctionCount === 0) return '点击一条字幕，在 Correction Desk 里保存一次人工修正。';
   return '当前闭环已跑通，可以导出 SRT 或继续添加术语重译。';
