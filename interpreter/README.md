@@ -18,6 +18,8 @@ Demo 视频：待录制，提交前替换为公开可访问链接。
 
 最终演示路径见 `docs/final-demo-path.md`。
 
+轻量 AI Gateway 设计见 `docs/backend-gateway.md`。
+
 视觉系统与页面层级设计见 `docs/visual-system.md`。
 
 ## 快速开始
@@ -58,6 +60,8 @@ DASHSCOPE_ASR_MODEL=qwen3-asr-flash
 ```bash
 npm run check:api
 ```
+
+本地后端定位为轻量 AI Gateway，只负责 Key 隔离、Provider 适配和统一错误边界，不做用户系统、数据库或字幕业务存储。
 
 验证命令：
 

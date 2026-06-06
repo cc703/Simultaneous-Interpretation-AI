@@ -29,7 +29,7 @@ try {
 }
 
 if (response.status === 503 && payload.code === 'missing_server_key') {
-  console.log('PASS missing_server_key: backend is reachable and correctly refuses ASR without OPENAI_API_KEY.');
+  console.log('PASS missing_server_key: gateway is reachable and correctly refuses ASR without a server ASR key.');
   process.exit(0);
 }
 

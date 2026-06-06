@@ -66,6 +66,8 @@ Vite 会把 `/api/*` 请求转发到本地后端 `http://localhost:8787`。
 
 项目支持把翻译和语音识别分开配置。默认 ASR Provider 使用阿里云百炼 DashScope Qwen-ASR，也保留 OpenAI-compatible ASR 入口。
 
+后端不是业务后台，而是轻量 AI Gateway：负责 Key 隔离、ASR Provider 适配、翻译 Provider 适配和统一错误边界。前端继续负责输入源、字幕、修正、术语和导出。详见 [轻量 AI Gateway 设计](interpreter/docs/backend-gateway.md)。
+
 `.env` 示例：
 
 ```env
@@ -102,6 +104,7 @@ npm run check:api
 - [最终演示路径](interpreter/docs/final-demo-path.md)
 - [录屏讲解脚本](interpreter/docs/demo-script.md)
 - [文件 ASR 烟测说明](interpreter/docs/file-asr-smoke.md)
+- [轻量 AI Gateway 设计](interpreter/docs/backend-gateway.md)
 
 ## 验证命令
 
@@ -129,7 +132,7 @@ npm run smoke:file-asr
 ├── AGENT.md                   # 开发协作与提交规范
 └── interpreter/
     ├── src/                   # React 同传工作台
-    ├── server/                # 本地 API 代理与 ASR/翻译服务
+    ├── server/                # Node AI Gateway 与 ASR/翻译代理
     ├── docs/                  # 演示脚本、视觉系统、测试说明
     ├── scripts/               # API 检查与文件 ASR 烟测脚本
     ├── test-media/            # 英文语音测试样本

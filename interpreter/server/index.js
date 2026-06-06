@@ -20,6 +20,7 @@ const server = http.createServer(async (request, response) => {
     if (request.method === 'GET' && request.url === '/api/health') {
       sendJson(response, 200, {
         ok: true,
+        gateway: 'ai-interpreter-gateway',
         hasOpenAIKey: Boolean(OPENAI_TRANSLATION_API_KEY || OPENAI_ASR_API_KEY),
         hasTranslationKey: Boolean(OPENAI_TRANSLATION_API_KEY),
         hasAsrKey: Boolean(getAsrApiKey()),
@@ -42,11 +43,17 @@ const server = http.createServer(async (request, response) => {
       return;
     }
 
-    sendJson(response, 404, { error: 'Not found.' });
+    sendError(response, 404, {
+      code: 'route_not_found',
+      error: 'Not found.',
+    });
   } catch (error) {
     console.error('[server] request failed:', error);
     if (!response.headersSent) {
-      sendJson(response, 500, { error: error.message || 'Server error.' });
+      sendError(response, 500, {
+        code: 'gateway_internal_error',
+        error: error.message || 'Server error.',
+      });
     } else {
       response.end();
     }
@@ -65,7 +72,17 @@ function readEnv(name, fallback) {
 
 async function proxyTranslation(request, response) {
   if (!ensureApiKey(response, OPENAI_TRANSLATION_API_KEY, 'translation')) return;
-  const payload = await readJson(request);
+  let payload;
+  try {
+    payload = await readJson(request);
+  } catch (error) {
+    sendError(response, 400, {
+      code: 'invalid_json',
+      error: error.message || 'Invalid JSON request body.',
+      purpose: 'translation',
+    });
+    return;
+  }
   let upstream;
   try {
     upstream = await fetch(`${OPENAI_TRANSLATION_BASE_URL.replace(/\/$/, '')}/chat/completions`, {
@@ -82,9 +99,11 @@ async function proxyTranslation(request, response) {
       }),
     });
   } catch (error) {
-    sendJson(response, 502, {
+    sendError(response, 502, {
       error: error.message || 'Translation upstream network error.',
       code: 'translation_network_error',
+      purpose: 'translation',
+      provider: 'openai-compatible',
       upstreamBaseUrl: redactBaseUrl(OPENAI_TRANSLATION_BASE_URL),
     });
     return;
@@ -92,7 +111,14 @@ async function proxyTranslation(request, response) {
 
   if (!upstream.ok) {
     const detail = await upstream.text().catch(() => '');
-    sendJson(response, upstream.status, { error: `Translation failed: ${detail}` });
+    sendError(response, upstream.status, {
+      error: `Translation failed: ${detail}`,
+      code: 'translation_upstream_error',
+      purpose: 'translation',
+      provider: 'openai-compatible',
+      upstreamStatus: upstream.status,
+      upstreamBaseUrl: redactBaseUrl(OPENAI_TRANSLATION_BASE_URL),
+    });
     return;
   }
 
@@ -113,7 +139,22 @@ async function proxyTranscription(request, response) {
   const body = await readRawBody(request);
   const contentType = request.headers['content-type'];
   if (!contentType?.includes('multipart/form-data')) {
-    sendJson(response, 400, { error: 'Expected multipart/form-data audio upload.' });
+    sendError(response, 400, {
+      error: 'Expected multipart/form-data audio upload.',
+      code: 'invalid_audio_upload',
+      purpose: 'asr',
+      provider: ASR_PROVIDER,
+    });
+    return;
+  }
+
+  if (!['dashscope', 'openai'].includes(ASR_PROVIDER)) {
+    sendError(response, 400, {
+      error: `Unsupported ASR provider: ${ASR_PROVIDER}.`,
+      code: 'unsupported_provider',
+      purpose: 'asr',
+      provider: ASR_PROVIDER,
+    });
     return;
   }
 
@@ -137,9 +178,11 @@ async function proxyOpenAITranscription({ body, contentType, response }) {
       body,
     });
   } catch (error) {
-    sendJson(response, 502, {
+    sendError(response, 502, {
       error: error.message || 'ASR upstream network error.',
       code: 'asr_network_error',
+      purpose: 'asr',
+      provider: 'openai',
       upstreamBaseUrl: redactBaseUrl(OPENAI_ASR_BASE_URL),
     });
     return;
@@ -147,9 +190,11 @@ async function proxyOpenAITranscription({ body, contentType, response }) {
 
   const text = await upstream.text();
   if (!upstream.ok) {
-    sendJson(response, upstream.status, {
+    sendError(response, upstream.status, {
       error: `ASR failed: ${text}`,
       code: 'asr_upstream_error',
+      purpose: 'asr',
+      provider: 'openai',
       upstreamStatus: upstream.status,
       upstreamBaseUrl: redactBaseUrl(OPENAI_ASR_BASE_URL),
     });
@@ -166,14 +211,22 @@ async function proxyDashScopeTranscription({ body, contentType, response }) {
   try {
     parsed = parseMultipartFile(body, contentType);
   } catch (error) {
-    sendJson(response, 400, { error: error.message, code: 'invalid_audio_upload' });
+    sendError(response, 400, {
+      error: error.message,
+      code: 'invalid_audio_upload',
+      purpose: 'asr',
+      provider: 'dashscope',
+    });
     return;
   }
 
   if (parsed.file.length > DASHSCOPE_MAX_AUDIO_BYTES) {
-    sendJson(response, 413, {
+    sendError(response, 413, {
       error: 'DashScope Qwen-ASR inline audio limit is 10MB. Use a shorter sample or switch to an object-storage URL workflow.',
-      code: 'dashscope_audio_too_large',
+      code: 'file_too_large',
+      purpose: 'asr',
+      provider: 'dashscope',
+      limitBytes: DASHSCOPE_MAX_AUDIO_BYTES,
     });
     return;
   }
@@ -201,9 +254,11 @@ async function proxyDashScopeTranscription({ body, contentType, response }) {
       }),
     });
   } catch (error) {
-    sendJson(response, 502, {
+    sendError(response, 502, {
       error: error.message || 'DashScope ASR upstream network error.',
       code: 'asr_network_error',
+      purpose: 'asr',
+      provider: 'dashscope',
       upstreamBaseUrl: redactBaseUrl(DASHSCOPE_ASR_BASE_URL),
     });
     return;
@@ -211,9 +266,11 @@ async function proxyDashScopeTranscription({ body, contentType, response }) {
 
   const bodyText = await upstream.text();
   if (!upstream.ok) {
-    sendJson(response, upstream.status, {
+    sendError(response, upstream.status, {
       error: `DashScope ASR failed: ${bodyText}`,
       code: 'asr_upstream_error',
+      purpose: 'asr',
+      provider: 'dashscope',
       upstreamStatus: upstream.status,
       upstreamBaseUrl: redactBaseUrl(DASHSCOPE_ASR_BASE_URL),
     });
@@ -224,18 +281,22 @@ async function proxyDashScopeTranscription({ body, contentType, response }) {
   try {
     payload = JSON.parse(bodyText);
   } catch {
-    sendJson(response, 502, {
+    sendError(response, 502, {
       error: `DashScope ASR returned non-JSON response: ${bodyText.slice(0, 240)}`,
       code: 'asr_invalid_response',
+      purpose: 'asr',
+      provider: 'dashscope',
     });
     return;
   }
 
   const text = payload.choices?.[0]?.message?.content?.trim();
   if (!text) {
-    sendJson(response, 502, {
+    sendError(response, 502, {
       error: `DashScope ASR returned no text: ${bodyText.slice(0, 240)}`,
       code: 'asr_empty_response',
+      purpose: 'asr',
+      provider: 'dashscope',
     });
     return;
   }
@@ -257,10 +318,11 @@ function getAsrModel() {
 
 function ensureApiKey(response, apiKey, purpose) {
   if (!apiKey) {
-    sendJson(response, 503, {
+    sendError(response, 503, {
       error: `Missing ${purpose} API key. Configure OPENAI_API_KEY or purpose-specific key in .env.`,
       code: 'missing_server_key',
       purpose,
+      provider: purpose === 'asr' ? ASR_PROVIDER : 'openai-compatible',
     });
     return false;
   }
@@ -338,4 +400,11 @@ async function readChunks(request) {
 function sendJson(response, status, payload) {
   response.writeHead(status, { 'Content-Type': 'application/json; charset=utf-8' });
   response.end(JSON.stringify(payload));
+}
+
+function sendError(response, status, payload) {
+  sendJson(response, status, {
+    ok: false,
+    ...payload,
+  });
 }
