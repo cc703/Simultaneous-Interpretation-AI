@@ -243,6 +243,7 @@ async function proxyDashScopeTranscription({ body, contentType, response }) {
       },
       body: JSON.stringify({
         model: DASHSCOPE_ASR_MODEL,
+        stream: false,
         messages: [
           {
             role: 'user',
@@ -252,6 +253,9 @@ async function proxyDashScopeTranscription({ body, contentType, response }) {
             ],
           },
         ],
+        asr_options: {
+          enable_itn: false,
+        },
       }),
     });
   } catch (error) {
