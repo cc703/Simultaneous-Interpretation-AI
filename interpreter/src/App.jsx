@@ -100,8 +100,8 @@ const UI_COPY = {
     autoDetect: '自动检测',
     targetLanguage: '目标语言',
     bilingual: '双语',
-    zhOnly: '只看中文',
-    enOnly: '只看英文',
+    targetOnly: '目标语言',
+    sourceOnly: '检测语言',
     latency: '延迟',
     context: '上下文',
     asr: 'ASR',
@@ -148,8 +148,8 @@ const UI_COPY = {
     autoDetect: 'Auto detect',
     targetLanguage: 'Target',
     bilingual: 'Bilingual',
-    zhOnly: 'Chinese',
-    enOnly: 'English',
+    targetOnly: 'Target',
+    sourceOnly: 'Detected',
     latency: 'Latency',
     context: 'Context',
     asr: 'ASR',
@@ -866,14 +866,14 @@ export default function App() {
                 className={subtitleMode === 'zh-only' ? 'active' : ''}
                 onClick={() => setSubtitleMode('zh-only')}
               >
-                {copy.zhOnly}
+                {copy.targetOnly}
               </button>
               <button
                 type="button"
                 className={subtitleMode === 'en-only' ? 'active' : ''}
                 onClick={() => setSubtitleMode('en-only')}
               >
-                {copy.enOnly}
+                {copy.sourceOnly}
               </button>
             </div>
             <div className="toolbar-note">
@@ -965,7 +965,7 @@ export default function App() {
 
           {showBanner && (
             <div className="subtitle-banner">
-              <span>{copy.currentSubtitle}</span>
+              <span>{subtitleMode === 'en-only' ? copy.sourceOnly : copy.targetOnly}</span>
               <strong>{subtitleMode === 'en-only' ? (currentInterim.en || selectedSubtitle.en) : (currentInterim.zh || selectedSubtitle.zh)}</strong>
             </div>
           )}
