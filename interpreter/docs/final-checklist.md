@@ -26,7 +26,7 @@
 ## 真实能力验证
 
 - [ ] Mic 模式在 Chrome / Edge 下可请求麦克风权限。
-- [ ] File 模式上传 25MB 以内英文音频/视频后，填写 ASR Key 可调用 `/audio/transcriptions`。
+- [ ] File 模式上传 25MB 以内英文音频/视频后，填写 `DASHSCOPE_API_KEY` 可通过 `/api/transcribe` 调用真实 ASR。
 - [ ] File 模式未填写 ASR Key 时，页面明确提示降级为演示转写流。
 - [ ] Live 模式可通过 `Choose tab audio` 请求标签页/屏幕音频。
 - [ ] Live 模式填写 ASR Key 后会显示 Live ASR 分片状态。

@@ -10,7 +10,7 @@
 
 PR-14：演示材料与提交文案完善。
 
-当前已建立 Vite + React 前端工程和 Node 后端代理，完成同传字幕工作台、Web Speech API STT、OpenAI-compatible 流式翻译、OpenAI `/audio/transcriptions` ASR 代理、翻译修正闭环、稳定 Demo 模式、文件上传真实转写、直播标签页/屏幕音频捕获与 MediaRecorder 分片 ASR、高级设置、Web Audio 波形、浏览器中文 TTS、SRT / 双语文本 / 同传复盘报告导出。页面包含输入源选择、Provider 配置、File/Live ASR 配置、术语表、质量诊断、修正记忆、字幕设置、时间轴字幕流、修正编辑器、底部大字幕和统计栏。
+当前已建立 Vite + React 前端工程和 Node 后端代理，完成同传字幕工作台、Web Speech API STT、OpenAI-compatible 流式翻译、DashScope Qwen-ASR 后端代理、翻译修正闭环、稳定 Demo 模式、文件上传真实转写、直播标签页/屏幕音频捕获与 MediaRecorder 分片 ASR、高级设置、Web Audio 波形、浏览器中文 TTS、SRT / 双语文本 / 同传复盘报告导出。页面包含输入源选择、Provider 配置、File/Live ASR 配置、术语表、质量诊断、修正记忆、字幕设置、时间轴字幕流、修正编辑器、底部大字幕和统计栏。
 
 Demo 视频：待录制，提交前替换为公开可访问链接。
 
@@ -34,12 +34,12 @@ npm run dev
 
 开发服务器默认运行在 `http://localhost:5173`。
 
-真实 ASR / OpenAI 翻译推荐同时启动本地后端代理：
+真实 ASR / 翻译推荐同时启动本地后端代理：
 
 ```bash
 cd interpreter
 copy .env.example .env
-# 在 .env 中填写 OPENAI_API_KEY
+# 在 .env 中填写 DASHSCOPE_API_KEY
 npm run dev:server
 ```
 
@@ -75,7 +75,7 @@ npm run smoke:file-asr
 npm run build
 ```
 
-`npm test` 使用 Node 原生测试覆盖质量诊断、修正记忆、SRT 和同传复盘报告生成。`npm run smoke:file-asr` 会使用 `test-media/sample-english-speech.wav` 上传到本地后端；未配置 `OPENAI_API_KEY` 时应明确通过 `missing_server_key` 边界测试，配置 Key 后会要求返回真实英文转写。样本来源和下载方式见 `docs/file-asr-smoke.md`。
+`npm test` 使用 Node 原生测试覆盖质量诊断、修正记忆、SRT 和同传复盘报告生成。`npm run smoke:file-asr` 会使用 `test-media/sample-english-speech.wav` 上传到本地后端；未配置 `DASHSCOPE_API_KEY` 或其他 ASR Key 时应明确通过 `missing_server_key` 边界测试，配置 Key 后会要求返回真实英文转写。样本来源和下载方式见 `docs/file-asr-smoke.md`。
 
 ## STT 验证
 
@@ -83,7 +83,7 @@ Chrome 或 Edge 中打开本地页面，点击输入源 `Mic`，再点击 `Start
 
 ## 翻译验证
 
-当前翻译引擎支持 OpenAI-compatible SSE 流式响应。左侧 `Configuration -> Translate` 可选择 DeepSeek、OpenAI 或 Custom，并填写 API Key；API Key 只保存在当前页面内存状态中，不写入 localStorage。若启动了本地后端并在 `.env` 配置 `OPENAI_API_KEY`，选择 `OpenAI` Provider 且浏览器 Key 为空时，前端会优先通过 `/api/translate` 使用服务端代理。
+当前翻译引擎支持 OpenAI-compatible SSE 流式响应。左侧 `Configuration -> Translate` 可选择 DeepSeek、Server Gateway 或 Custom，并填写 API Key；API Key 只保存在当前页面内存状态中，不写入 localStorage。若启动了本地后端并在 `.env` 配置 `DASHSCOPE_API_KEY`，选择 `Server Gateway` 且浏览器 Key 为空时，前端会优先通过 `/api/translate` 使用服务端代理。
 
 ## 修正闭环验证
 
@@ -112,7 +112,7 @@ Chrome 或 Edge 中打开本地页面，点击输入源 `Mic`，再点击 `Start
 1. 点击输入源 `File`，可点击 `Use sample audio` 一键加载内置英文样本，也可上传 `.mp3`、`.mp4`、`.wav`、`.m4a`、`.webm` 或 `.ogg` 文件。
 2. 推荐启动已配置 `DASHSCOPE_API_KEY` 的本地后端代理；默认国产 ASR 模型为 `qwen3-asr-flash`。如需 OpenAI ASR，可把 `.env` 中 `ASR_PROVIDER` 改为 `openai`。
 3. 内置样本来自 `test-media/sample-english-speech.wav`，并复制到 `public/demo-media/` 供页面一键加载；左侧会显示文件名、大小、格式和时长。
-4. 点击 `Start Interpreting` 后，系统会把文件发送到 `/audio/transcriptions` 做真实英文转写。
+4. 点击 `Start Interpreting` 后，系统会把文件发送到本地 `/api/transcribe`，再由 Gateway 转给 DashScope Qwen-ASR 或可选 OpenAI-compatible ASR。
 5. 转写结果会按英文句子进入现有中文翻译、字幕修正、术语命中、TTS 和导出流程。
 6. 如果未填写浏览器 ASR Key 且后端没有配置 Key，内置样本会明确提示并使用绑定英文转写文本继续跑完 File 主线；普通文件会降级为演示转写流，不会伪装成真实 ASR。
 7. 如果翻译 Key 不可用，系统会使用标注的本地演示译文，确保字幕修正、术语命中、TTS 和导出仍可演示。
@@ -180,7 +180,7 @@ Chrome 或 Edge 中打开本地页面，点击输入源 `Mic`，再点击 `Start
 当前作品聚焦比赛题目二要求的“外语音频流实时翻译成中文、字幕/语音输出、翻译修正能力”。为了保证 72 小时内可稳定演示，系统提供三层能力：
 
 - 稳定评审闭环：Demo 模式可以在无 Key 情况下稳定展示“外语音频流输入 -> 中文字幕输出 -> 人工修正 -> 术语重译 -> TTS 播报 -> 导出”。
-- 真实浏览器能力：Mic 使用 Web Speech API 做英文语音识别；File 模式可调用 OpenAI ASR 做真实文件转写；Live 模式可通过 MediaRecorder 分片调用 ASR；Provider 配置后可走真实 OpenAI-compatible 流式翻译。
+- 真实浏览器能力：Mic 使用 Web Speech API 做英文语音识别；File 模式可通过本地 Gateway 调用 DashScope 或可选 OpenAI ASR 做真实文件转写；Live 模式可通过 MediaRecorder 分片调用 ASR；Provider 配置后可走真实 OpenAI-compatible 流式翻译。
 - 翻译修正能力：人工修正会写入 Correction Memory，并作为后续翻译提示的一部分；Risk Review 会提示漏译、术语未命中和占位翻译。
 - 能力限制：Live ASR 依赖浏览器 MediaRecorder、用户共享音频权限、ASR Key 和网络质量；分片转写不是毫秒级实时，适合 4 秒左右的准实时字幕。
 

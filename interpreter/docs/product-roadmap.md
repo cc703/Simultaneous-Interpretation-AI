@@ -6,7 +6,7 @@
 
 - Demo：无 Key 稳定展示外语输入、中文字幕、修正、术语重译、TTS 和导出。
 - Mic：浏览器 Web Speech API 识别麦克风英文。
-- File：可调用 OpenAI `/audio/transcriptions` 做真实文件 ASR，再进入翻译链路。
+- File：可通过本地 Gateway 调用 DashScope Qwen-ASR 做真实文件 ASR，再进入翻译链路；OpenAI ASR 保留为可选 Provider。
 - Live：可捕获标签页/屏幕音频并展示波形；填写 ASR Key 后可用 MediaRecorder 分片送入真实 ASR。
 
 ## 下一步优先级

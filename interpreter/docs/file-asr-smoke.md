@@ -41,7 +41,7 @@ DASHSCOPE_ASR_MODEL=qwen3-asr-flash
 如果 `.env` 没有配置 `DASHSCOPE_API_KEY` 或其他 ASR Key，期望输出：
 
 ```text
-PASS missing_server_key: backend is reachable and correctly refuses ASR without OPENAI_API_KEY.
+PASS missing_server_key: gateway is reachable and correctly refuses ASR without a server ASR key.
 ```
 
 如果 `.env` 已配置可用的 `DASHSCOPE_API_KEY`，脚本会把音频上传到 `/api/transcribe`，通过 Qwen-ASR 返回非空英文转写文本。

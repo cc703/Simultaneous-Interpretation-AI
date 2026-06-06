@@ -16,19 +16,19 @@ npm install
 npm run dev
 ```
 
-2. 如需展示真实 OpenAI ASR / 翻译代理，另开终端：
+2. 如需展示真实百炼 ASR / 翻译代理，另开终端：
 
 ```bash
 copy .env.example .env
-# 在 .env 中填写 OPENAI_API_KEY
+# 在 .env 中填写 DASHSCOPE_API_KEY
 npm run dev:server
 ```
 
 3. 打开 `http://localhost:5173`。
 4. 保持输入源为 `Demo`，不需要 API Key 也能完成稳定演示。
 5. 在左侧 Demo 场景中选择一个最适合讲解的预设，例如 `Product Launch`、`Technical Talk` 或 `Business Meeting`。
-6. 可选：如果要展示真实流式翻译，可以在浏览器内填写 OpenAI-compatible API Key，也可以启动本地后端代理并选择 `OpenAI` Provider。
-7. 可选：如果要展示真实文件或直播 ASR，可以在浏览器内填写 OpenAI ASR Key，也可以使用配置了 `OPENAI_API_KEY` 的本地后端代理。
+6. 可选：如果要展示真实流式翻译，可以启动本地后端代理并选择 `Server Gateway`，默认使用百炼 `qwen-plus`。
+7. 可选：如果要展示真实文件或直播 ASR，可以使用配置了 `DASHSCOPE_API_KEY` 的本地后端代理，默认使用百炼 `qwen3-asr-flash`。
 
 ## 讲解顺序
 
@@ -85,7 +85,7 @@ npm run dev:server
 
 ### 6. 展示文件模式
 
-“文件模式支持上传本地英文音频或视频。填写浏览器 ASR Key，或者启动配置了 OPENAI_API_KEY 的本地后端代理后，系统会调用 `/audio/transcriptions` 做真实英文转写，再进入中文翻译、修正、术语和导出流程。”
+“文件模式支持上传本地英文音频或视频。启动配置了 DASHSCOPE_API_KEY 的本地后端代理后，系统会通过 `/api/transcribe` 调用百炼 Qwen-ASR 做真实英文转写，再进入中文翻译、修正、术语和导出流程。”
 
 画面操作：
 
@@ -99,7 +99,7 @@ npm run dev:server
 
 ### 7. 展示直播捕获和分片 ASR
 
-“Live 模式可以捕获浏览器标签页或屏幕音频。填写浏览器 ASR Key，或者启动配置了 OPENAI_API_KEY 的本地后端代理后，系统会使用 MediaRecorder 按分片长度持续转写直播音频，再送入中文翻译链路。”
+“Live 模式可以捕获浏览器标签页或屏幕音频。启动配置了 DASHSCOPE_API_KEY 的本地后端代理后，系统会使用 MediaRecorder 按分片长度持续转写直播音频，再送入中文翻译链路。”
 
 画面操作：
 
@@ -129,6 +129,6 @@ npm run dev:server
 
 - 不要说“无限制支持任意大小文件音频真实识别”。
 - 不要说“直播同传无延迟”。
-- 可以说“文件模式支持浏览器直传到 OpenAI ASR，25MB 以内更适合前端直传”。
+- 可以说“文件模式支持通过本地 Gateway 调用百炼 Qwen-ASR，当前前端上传限制为 25MB，DashScope inline 音频建议控制在 10MB 内”。
 - 可以说“直播模式支持 MediaRecorder 分片 ASR，属于几秒级准实时字幕”。
 - 可以说“Demo 模式用于保证评审时稳定展示题目要求的完整产品闭环”。
