@@ -10,6 +10,7 @@ import {
   BookMarked,
   Radio,
   Settings,
+  Sparkles,
   Languages,
   ListChecks,
   PlayCircle,
