@@ -5,7 +5,9 @@ import {
   ClipboardCheck,
   AlertTriangle,
   FileAudio,
+  FolderOpen,
   Mic,
+  BookMarked,
   Radio,
   Settings,
   Languages,
@@ -130,6 +132,7 @@ export default function App() {
   const [serverHealth, setServerHealth] = useState({ ok: false, hasOpenAIKey: false });
   const [settingsOpen, setSettingsOpen] = useState(false);
   const [configTab, setConfigTab] = useState('translate');
+  const [viewMode, setViewMode] = useState('workspace');
   const audioRef = useRef(null);
   const displaySubtitles = subtitles;
   const hasSubtitles = displaySubtitles.length > 0;
@@ -502,11 +505,35 @@ export default function App() {
             <p>Topic 2 · 实时英中同传工作台</p>
           </div>
         </div>
+        <div className="view-switcher" aria-label="Workspace views">
+          <button
+            type="button"
+            className={viewMode === 'workspace' ? 'active' : ''}
+            onClick={() => setViewMode('workspace')}
+          >
+            <Languages size={15} />
+            实时同传工作台
+          </button>
+          <button
+            type="button"
+            className={viewMode === 'dashboard' ? 'active' : ''}
+            onClick={() => setViewMode('dashboard')}
+          >
+            <FolderOpen size={15} />
+            复盘与项目管理
+          </button>
+          <button
+            type="button"
+            className={viewMode === 'terms' ? 'active' : ''}
+            onClick={() => setViewMode('terms')}
+          >
+            <BookMarked size={15} />
+            术语与记忆库
+          </button>
+        </div>
         <div className="status-pill">
           <span />
-          {isRunning
-            ? `${sourceMode} audio -> Chinese captions`
-            : 'Interpreter console ready'}
+          {serverHealth.ok ? `AI 引擎 Online · ${serverHealth.asrProvider ?? 'gateway'}` : 'Gateway checking'}
         </div>
         <div className="top-actions" aria-label="Header actions">
           <button type="button" onClick={() => setSettingsOpen(true)}>
@@ -887,6 +914,26 @@ export default function App() {
         </aside>
 
         <section className="right-panel" aria-label="Subtitle workspace">
+          {viewMode === 'dashboard' && (
+            <DashboardView
+              correctionCount={correctionCount}
+              displaySubtitles={displaySubtitles}
+              glossary={glossary}
+              qualitySummary={qualitySummary}
+              sourceMode={sourceMode}
+            />
+          )}
+
+          {viewMode === 'terms' && (
+            <TermsMemoryView
+              correctionMemory={correctionMemory}
+              glossary={glossary}
+              qualitySummary={qualitySummary}
+            />
+          )}
+
+          {viewMode === 'workspace' && (
+            <>
           <div className="toolbar">
             <div className="mode-tabs">
               <button
@@ -1080,6 +1127,8 @@ export default function App() {
             <span>Glossary {glossary.length}</span>
             <span>Provider {provider}</span>
           </footer>
+            </>
+          )}
         </section>
       </main>
 
@@ -1157,6 +1206,139 @@ export default function App() {
           </section>
         </div>
       )}
+    </div>
+  );
+}
+
+function DashboardView({
+  correctionCount,
+  displaySubtitles,
+  glossary,
+  qualitySummary,
+  sourceMode,
+}) {
+  const confirmedCount = displaySubtitles.filter((subtitle) => subtitle.corrected).length;
+  const glossaryHitCount = displaySubtitles.filter((subtitle) => subtitle.termsApplied.length > 0).length;
+  const exportReady = displaySubtitles.length > 0 ? 'Ready' : 'Waiting';
+
+  return (
+    <div className="dashboard-view" aria-label="Review and project dashboard">
+      <section className="dashboard-hero">
+        <div>
+          <span>复盘与项目管理</span>
+          <h2>同传会话质量总览</h2>
+          <p>把当前字幕、风险、术语命中和人工修正汇总成可交付的复盘视图，便于录屏讲解和最终提交说明。</p>
+        </div>
+        <div className="dashboard-score">
+          <strong>{Math.max(0, 100 - qualitySummary.riskCount * 7).toFixed(1)}</strong>
+          <span>Session score</span>
+        </div>
+      </section>
+
+      <div className="dashboard-metrics">
+        <MetricCard label="Input mode" value={sourceMode.toUpperCase()} note="当前演示输入源" />
+        <MetricCard label="Captions" value={displaySubtitles.length} note="已生成字幕条数" />
+        <MetricCard label="Corrections" value={correctionCount || confirmedCount} note="人工修正沉淀" />
+        <MetricCard label="Glossary hits" value={glossaryHitCount} note={`${glossary.length} terms loaded`} />
+        <MetricCard label="Risk flags" value={qualitySummary.riskCount} note="质量诊断风险项" />
+        <MetricCard label="Export" value={exportReady} note="SRT / Review / Copy" />
+      </div>
+
+      <div className="dashboard-grid">
+        <section className="ops-panel">
+          <h2>质量诊断队列</h2>
+          {qualitySummary.risky.length === 0 ? (
+            <p className="review-empty">暂无高风险字幕。演示中可通过术语或人工修正触发复盘证据。</p>
+          ) : (
+            <div className="ops-list">
+              {qualitySummary.risky.slice(0, 5).map((item) => (
+                <div key={item.subtitle.id}>
+                  <span>{item.subtitle.timeLabel}</span>
+                  <strong>{item.issues.find((issue) => !issue.positive)?.detail}</strong>
+                </div>
+              ))}
+            </div>
+          )}
+        </section>
+
+        <section className="ops-panel">
+          <h2>最终提交证据</h2>
+          <div className="submission-checks">
+            <span className={displaySubtitles.length ? 'done' : ''}>字幕生成</span>
+            <span className={correctionCount ? 'done' : ''}>翻译修正</span>
+            <span className={glossary.length ? 'done' : ''}>术语表</span>
+            <span className={displaySubtitles.length ? 'done' : ''}>导出闭环</span>
+          </div>
+        </section>
+      </div>
+    </div>
+  );
+}
+
+function TermsMemoryView({ correctionMemory, glossary, qualitySummary }) {
+  return (
+    <div className="terms-view" aria-label="Terms and correction memory">
+      <section className="dashboard-hero">
+        <div>
+          <span>术语与记忆库</span>
+          <h2>翻译修正沉淀</h2>
+          <p>术语表和人工修正共同影响后续重译，是本项目区别于普通翻译 API Demo 的核心闭环。</p>
+        </div>
+        <div className="dashboard-score compact">
+          <strong>{glossary.length}</strong>
+          <span>Terms</span>
+        </div>
+      </section>
+
+      <div className="terms-layout">
+        <section className="ops-panel">
+          <h2>当前术语表</h2>
+          <div className="terms-table">
+            {glossary.map((term) => (
+              <div key={term.id ?? term.source}>
+                <span>{term.source}</span>
+                <strong>{term.target}</strong>
+                <em>{term.enabled ? '实时生效' : '停用'}</em>
+              </div>
+            ))}
+          </div>
+        </section>
+
+        <section className="ops-panel">
+          <h2>Correction Memory</h2>
+          {correctionMemory.length === 0 ? (
+            <p className="review-empty">还没有保存人工修正。点击任意字幕并保存译文后，这里会出现修正记忆。</p>
+          ) : (
+            <div className="ops-list">
+              {correctionMemory.slice(-6).map((record) => (
+                <div key={record.id}>
+                  <span>{record.en}</span>
+                  <strong>{record.afterZh}</strong>
+                </div>
+              ))}
+            </div>
+          )}
+        </section>
+
+        <section className="ops-panel wide">
+          <h2>术语命中与风险</h2>
+          <div className="submission-checks">
+            <span className={qualitySummary.glossaryHitRate > 0 ? 'done' : ''}>Glossary hit {qualitySummary.glossaryHitRate}%</span>
+            <span className={qualitySummary.riskCount === 0 ? 'done' : ''}>Risk flags {qualitySummary.riskCount}</span>
+            <span className={correctionMemory.length ? 'done' : ''}>Memory {correctionMemory.length}</span>
+          </div>
+        </section>
+      </div>
+    </div>
+  );
+}
+
+function MetricCard({ label, note, value }) {
+  return (
+    <div className="metric-card">
+      <span>{label}</span>
+      <strong>{value}</strong>
+      <small>{note}</small>
     </div>
   );
 }
