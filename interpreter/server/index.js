@@ -233,6 +233,7 @@ async function proxyDashScopeTranscription({ body, contentType, response }) {
   }
 
   const dataUrl = `data:${parsed.contentType};base64,${parsed.file.toString('base64')}`;
+  const audioFormat = inferAudioFormat(parsed.contentType);
   let upstream;
   try {
     upstream = await fetch(`${DASHSCOPE_ASR_BASE_URL.replace(/\/$/, '')}/chat/completions`, {
@@ -248,8 +249,7 @@ async function proxyDashScopeTranscription({ body, contentType, response }) {
           {
             role: 'user',
             content: [
-              { type: 'input_audio', input_audio: { data: dataUrl } },
-              { type: 'text', text: '请将这段英文音频完整转写为英文文本，只输出转写内容。' },
+              { type: 'input_audio', input_audio: { data: dataUrl, format: audioFormat } },
             ],
           },
         ],
@@ -295,7 +295,7 @@ async function proxyDashScopeTranscription({ body, contentType, response }) {
     return;
   }
 
-  const text = payload.choices?.[0]?.message?.content?.trim();
+  const text = extractDashScopeAsrText(payload);
   if (!text) {
     sendError(response, 502, {
       error: `DashScope ASR returned no text: ${bodyText.slice(0, 240)}`,
@@ -307,6 +307,35 @@ async function proxyDashScopeTranscription({ body, contentType, response }) {
   }
 
   sendJson(response, 200, { text });
+}
+
+function extractDashScopeAsrText(payload) {
+  const content = payload.choices?.[0]?.message?.content;
+  if (typeof content === 'string') return content.trim();
+  if (Array.isArray(content)) {
+    return content
+      .map((item) => {
+        if (typeof item === 'string') return item;
+        if (typeof item?.text === 'string') return item.text;
+        if (typeof item?.transcript === 'string') return item.transcript;
+        return '';
+      })
+      .join('')
+      .trim();
+  }
+  return '';
+}
+
+function inferAudioFormat(contentType) {
+  const normalized = contentType.toLowerCase();
+  if (normalized.includes('mpeg') || normalized.includes('mp3')) return 'mp3';
+  if (normalized.includes('wav') || normalized.includes('wave')) return 'wav';
+  if (normalized.includes('webm')) return 'webm';
+  if (normalized.includes('ogg')) return 'ogg';
+  if (normalized.includes('mp4')) return 'mp4';
+  if (normalized.includes('m4a')) return 'm4a';
+  if (normalized.includes('flac')) return 'flac';
+  return 'wav';
 }
 
 function getAsrApiKey() {
