@@ -1,13 +1,9 @@
 import { useEffect, useMemo, useRef, useState } from 'react';
 import {
-  BadgeCheck,
   Captions,
   ClipboardCheck,
-  AlertTriangle,
   FileAudio,
-  FolderOpen,
   Mic,
-  BookMarked,
   Radio,
   Settings,
   Sparkles,
@@ -41,7 +37,7 @@ import {
   setTTSRate,
 } from './engine/index.js';
 import { useStore } from './store/index.js';
-import { copyBilingual, exportReviewReport, exportSRT } from './utils/export.js';
+import { copyBilingual, exportSRT } from './utils/export.js';
 import { buildCorrectionMemory, summarizeQuality } from './utils/quality.js';
 import { getServerHealth } from './engine/serverApi.js';
 
@@ -57,6 +53,99 @@ const SAMPLE_TRANSCRIPT = [
   'If a phrase is translated incorrectly, the user can correct it immediately.',
   'At the end, the bilingual transcript can be exported for review.',
 ].join(' ');
+
+const UI_COPY = {
+  zh: {
+    productSubtitle: '题目二 · AI 同声传译助手',
+    engineChecking: '引擎检查中',
+    engineOnline: 'AI 引擎在线',
+    settings: '设置',
+    export: '导出',
+    copy: '复制',
+    source: '输入源',
+    demo: '演示',
+    mic: '麦克风',
+    file: '文件',
+    live: '直播',
+    start: '开始同传',
+    stop: '停止同传',
+    sample: '加载样本',
+    sampleLoading: '样本加载中',
+    upload: '上传音频/视频',
+    chooseLive: '选择直播音频',
+    stopLive: '停止直播捕获',
+    subtitles: '字幕',
+    bilingual: '双语',
+    zhOnly: '只看中文',
+    enOnly: '只看英文',
+    latency: '延迟',
+    context: '上下文',
+    asr: 'ASR',
+    ready: '待开始',
+    readyBadge: '等待输入',
+    readySource: 'Click Start Interpreting to play or capture English audio.',
+    readyZh: '选择文件或直播源后点击开始，系统会生成中文字幕。',
+    recognizing: '识别中',
+    correction: '翻译修正',
+    saveCorrection: '保存修正',
+    retranslate: '术语重译',
+    currentSubtitle: '当前字幕',
+    translated: '字幕',
+    corrections: '修正',
+    glossary: '术语',
+    provider: '引擎',
+    liveBoundary: 'Live 为几秒级准实时分片；无 ASR Key 时只显示捕获状态，不生成假字幕。',
+    liveUse: '适用于网页直播、社交直播、媒体直播和线上会议。',
+    advancedSettings: '高级设置',
+    advancedHint: '这些配置会影响后续识别、翻译和播报。',
+    close: '关闭',
+  },
+  en: {
+    productSubtitle: 'Topic 2 · AI simultaneous interpretation assistant',
+    engineChecking: 'Checking engine',
+    engineOnline: 'AI engine online',
+    settings: 'Settings',
+    export: 'Export',
+    copy: 'Copy',
+    source: 'Source',
+    demo: 'Demo',
+    mic: 'Mic',
+    file: 'File',
+    live: 'Live',
+    start: 'Start',
+    stop: 'Stop',
+    sample: 'Load sample',
+    sampleLoading: 'Loading',
+    upload: 'Upload audio/video',
+    chooseLive: 'Choose live audio',
+    stopLive: 'Stop live capture',
+    subtitles: 'Captions',
+    bilingual: 'Bilingual',
+    zhOnly: 'Chinese',
+    enOnly: 'English',
+    latency: 'Latency',
+    context: 'Context',
+    asr: 'ASR',
+    ready: 'Ready',
+    readyBadge: 'Waiting',
+    readySource: 'Click Start Interpreting to play or capture English audio.',
+    readyZh: 'Select a file or live source, then start to generate Chinese captions.',
+    recognizing: 'Recognizing',
+    correction: 'Correction',
+    saveCorrection: 'Save',
+    retranslate: 'Retranslate',
+    currentSubtitle: 'Current subtitle',
+    translated: 'Captions',
+    corrections: 'Corrections',
+    glossary: 'Glossary',
+    provider: 'Provider',
+    liveBoundary: 'Live uses short near-real-time chunks. Without ASR credentials, it shows capture state only.',
+    liveUse: 'For web streams, social live rooms, media streams, and online meetings.',
+    advancedSettings: 'Advanced settings',
+    advancedHint: 'These settings affect later recognition, translation, and voice output.',
+    close: 'Close',
+  },
+};
 
 export default function App() {
   const isRunning = useStore((state) => state.isRunning);
@@ -133,23 +222,14 @@ export default function App() {
   const [serverHealth, setServerHealth] = useState({ ok: false, hasOpenAIKey: false });
   const [settingsOpen, setSettingsOpen] = useState(false);
   const [configTab, setConfigTab] = useState('translate');
-  const [viewMode, setViewMode] = useState('workspace');
+  const [uiLanguage, setUiLanguage] = useState('zh');
   const audioRef = useRef(null);
+  const copy = UI_COPY[uiLanguage];
   const displaySubtitles = subtitles;
   const hasSubtitles = displaySubtitles.length > 0;
   const activeDemoScenario = getDemoScenario(demoScenarioId);
   const hasServerAsrKey = Boolean(serverHealth.ok && (serverHealth.hasAsrKey ?? serverHealth.hasOpenAIKey));
   const hasLiveAsr = Boolean(asrApiKey.trim() || hasServerAsrKey);
-  const workflowSteps = buildWorkflowSteps({
-    sourceMode,
-    fileMeta,
-    asrApiKey,
-    serverHasApiKey: hasServerAsrKey,
-    apiKey,
-    provider,
-    hasSubtitles,
-    correctionCount,
-  });
   const nextAction = getNextAction({
     sourceMode,
     fileMeta,
@@ -161,8 +241,6 @@ export default function App() {
     correctionCount,
     isRunning,
   });
-  const glossaryHitCount = displaySubtitles.filter((subtitle) => subtitle.termsApplied.length > 0).length;
-  const readinessScore = workflowSteps.filter((step) => step.done).length;
   const qualitySummary = useMemo(
     () => summarizeQuality(displaySubtitles, glossary),
     [displaySubtitles, glossary],
@@ -171,15 +249,6 @@ export default function App() {
     () => buildCorrectionMemory(correctionHistory, displaySubtitles),
     [correctionHistory, displaySubtitles],
   );
-  const demoGuideItems = buildDemoGuideItems({
-    sourceMode,
-    activeDemoScenario,
-    hasSubtitles,
-    glossaryHitCount,
-    correctionCount,
-    correctionMemory,
-    qualitySummary,
-  });
   const selectedSubtitle = useMemo(() => (
     displaySubtitles.find((subtitle) => subtitle.id === selectedSubtitleId)
       ?? displaySubtitles.find((subtitle) => subtitle.isCurrent)
@@ -248,6 +317,11 @@ export default function App() {
     if (sourceMode === 'file') {
       startElementAnalyser(audioRef.current);
       await startFileInterpretation();
+      return;
+    }
+
+    if (sourceMode === 'live') {
+      await handleLiveCapture();
       return;
     }
 
@@ -358,18 +432,6 @@ export default function App() {
   const handleExport = () => {
     if (!hasSubtitles) return;
     exportSRT(displaySubtitles);
-  };
-
-  const handleExportReview = () => {
-    if (!hasSubtitles) return;
-    exportReviewReport({
-      subtitles: displaySubtitles,
-      glossary,
-      correctionHistory,
-      qualitySummary,
-      sourceMode,
-      provider,
-    });
   };
 
   const handleCopy = async () => {
@@ -503,70 +565,43 @@ export default function App() {
           </span>
           <div>
             <h1>Simulcast Interpreter</h1>
-            <p>Topic 2 · 实时英中同传工作台</p>
+            <p>{copy.productSubtitle}</p>
           </div>
         </div>
-        <div className="view-switcher" aria-label="Workspace views">
+        <div className="language-switcher" aria-label="Language switch">
           <button
             type="button"
-            className={viewMode === 'workspace' ? 'active' : ''}
-            onClick={() => setViewMode('workspace')}
+            className={uiLanguage === 'zh' ? 'active' : ''}
+            onClick={() => setUiLanguage('zh')}
           >
-            <Languages size={15} />
-            实时同传工作台
+            中
           </button>
           <button
             type="button"
-            className={viewMode === 'dashboard' ? 'active' : ''}
-            onClick={() => setViewMode('dashboard')}
+            className={uiLanguage === 'en' ? 'active' : ''}
+            onClick={() => setUiLanguage('en')}
           >
-            <FolderOpen size={15} />
-            复盘与项目管理
-          </button>
-          <button
-            type="button"
-            className={viewMode === 'terms' ? 'active' : ''}
-            onClick={() => setViewMode('terms')}
-          >
-            <BookMarked size={15} />
-            术语与记忆库
+            EN
           </button>
         </div>
         <div className="status-pill">
           <span />
-          {serverHealth.ok ? `AI 引擎 Online · ${serverHealth.asrProvider ?? 'gateway'}` : 'Gateway checking'}
+          {serverHealth.ok ? `${copy.engineOnline} · ${serverHealth.asrProvider ?? 'gateway'}` : copy.engineChecking}
         </div>
         <div className="top-actions" aria-label="Header actions">
           <button type="button" onClick={() => setSettingsOpen(true)}>
             <Settings size={15} />
-            Settings
+            {copy.settings}
           </button>
-          <button type="button" disabled={!hasSubtitles} onClick={handleExport}>Export</button>
-          <button type="button" disabled={!hasSubtitles} onClick={handleExportReview}>Review</button>
-          <button type="button" disabled={!hasSubtitles} onClick={handleCopy}>Copy</button>
+          <button type="button" disabled={!hasSubtitles} onClick={handleExport}>{copy.export}</button>
+          <button type="button" disabled={!hasSubtitles} onClick={handleCopy}>{copy.copy}</button>
         </div>
       </header>
 
       <main className="workspace">
         <aside className="left-panel" aria-label="Interpreter controls">
-          <section className="panel-block product-guide">
-            <h2>Workflow</h2>
-            <div className="workflow-steps">
-              {workflowSteps.map((step) => (
-                <div className={`workflow-step ${step.done ? 'done' : ''}`} key={step.label}>
-                  <step.icon size={15} />
-                  <span>{step.label}</span>
-                </div>
-              ))}
-            </div>
-            <div className="next-action">
-              <PlayCircle size={16} />
-              <span>{nextAction}</span>
-            </div>
-          </section>
-
           <section className="panel-block">
-            <h2>Input Source</h2>
+            <h2>{copy.source}</h2>
             <div className="segmented">
               <button
                 type="button"
@@ -574,7 +609,7 @@ export default function App() {
                 onClick={() => setSourceMode('demo')}
               >
                 <Sparkles size={14} />
-                Demo
+                {copy.demo}
               </button>
               <button
                 type="button"
@@ -582,7 +617,7 @@ export default function App() {
                 onClick={() => setSourceMode('mic')}
               >
                 <Mic size={14} />
-                Mic
+                {copy.mic}
               </button>
               <button
                 type="button"
@@ -590,7 +625,7 @@ export default function App() {
                 onClick={() => setSourceMode('file')}
               >
                 <FileAudio size={14} />
-                File
+                {copy.file}
               </button>
               <button
                 type="button"
@@ -598,7 +633,7 @@ export default function App() {
                 onClick={() => setSourceMode('live')}
               >
                 <Radio size={14} />
-                Live
+                {copy.live}
               </button>
             </div>
             <div className="source-card">
@@ -665,10 +700,10 @@ export default function App() {
                   onClick={handleLoadSampleFile}
                 >
                   <FileAudio size={15} />
-                  {isSampleLoading ? 'Loading sample...' : 'Use sample audio'}
+                  {isSampleLoading ? copy.sampleLoading : copy.sample}
                 </button>
                 <label>
-                  <span><Upload size={13} /> Upload media</span>
+                  <span><Upload size={13} /> {copy.upload}</span>
                   <input
                     accept=".mp3,.mp4,.wav,.m4a,.webm,.ogg,audio/*,video/*"
                     type="file"
@@ -716,9 +751,9 @@ export default function App() {
               <div className="live-capture-card">
                 <LiveWorkflow stage={liveStage} hasSubtitles={hasSubtitles} />
                 <button type="button" onClick={handleLiveCapture}>
-                  {getLivePrimaryAction({ isCapturing, liveStage, hasLiveAsr })}
+                  {isCapturing ? copy.stopLive : copy.chooseLive}
                 </button>
-                <p>适用于网页直播、社交平台直播、媒体直播和线上会议。用户需要在浏览器共享弹窗中选择标签页或屏幕，并共享音频。</p>
+                <p>{copy.liveUse}</p>
                 <div className="live-state-grid" aria-label="Live interpretation status">
                   <LiveStateItem label="Source" value={captureSourceLabel || 'Not selected'} state={captureSourceLabel ? 'ok' : 'idle'} />
                   <LiveStateItem label="Permission" value={isCapturing ? 'Audio captured' : liveStage === 'requesting' ? 'Requesting' : 'Required'} state={isCapturing ? 'ok' : liveStage === 'requesting' ? 'warn' : 'idle'} />
@@ -727,7 +762,7 @@ export default function App() {
                   <LiveStateItem label="Output" value={hasSubtitles ? 'Captions ready' : 'Waiting'} state={hasSubtitles ? 'ok' : 'idle'} />
                 </div>
                 <div className="live-boundary">
-                  Live 是几秒级准实时分片；没有 ASR Key 时只展示捕获、波形和配置缺口，不生成直播假字幕。
+                  {copy.liveBoundary}
                 </div>
                 <div className="live-stats" aria-label="Live ASR queue statistics">
                   <span><strong>{liveStats.queued}</strong> Queued</span>
@@ -741,8 +776,157 @@ export default function App() {
             )}
           </section>
 
-          <section className="panel-block config-panel">
-            <h2>Configuration</h2>
+          <button className="run-button" type="button" onClick={handleRunClick}>
+            <PlayCircle size={16} />
+            {isRunning ? copy.stop : getRunButtonLabel({ isRunning, sourceMode, isCapturing, copy })}
+          </button>
+          <div className="next-action compact-next">
+            <span>{nextAction}</span>
+          </div>
+        </aside>
+
+        <section className="right-panel" aria-label="Subtitle workspace">
+          <div className="toolbar">
+            <div className="workspace-title">
+              <span>{copy.subtitles}</span>
+              <strong>{sourceMode === 'file' ? copy.file : sourceMode === 'live' ? copy.live : sourceMode === 'mic' ? copy.mic : copy.demo}</strong>
+            </div>
+            <div className="mode-tabs">
+              <button
+                type="button"
+                className={subtitleMode === 'bilingual' ? 'active' : ''}
+                onClick={() => setSubtitleMode('bilingual')}
+              >
+                {copy.bilingual}
+              </button>
+              <button
+                type="button"
+                className={subtitleMode === 'zh-only' ? 'active' : ''}
+                onClick={() => setSubtitleMode('zh-only')}
+              >
+                {copy.zhOnly}
+              </button>
+              <button
+                type="button"
+                className={subtitleMode === 'en-only' ? 'active' : ''}
+                onClick={() => setSubtitleMode('en-only')}
+              >
+                {copy.enOnly}
+              </button>
+            </div>
+            <div className="toolbar-note">
+              {copy.latency} {latencyMs ? `${(latencyMs / 1000).toFixed(1)}s` : '1.8s'} · {copy.context} {contextWindow} · {copy.asr} {serverHealth.asrProvider ?? (serverHealth.hasOpenAIKey ? 'server' : 'browser')}
+            </div>
+          </div>
+
+          <div className="waveform" aria-label="Audio waveform">
+            {Array.from({ length: 36 }).map((_, index) => (
+              <span
+                // eslint-disable-next-line react/no-array-index-key
+                key={index}
+                style={{ '--level': `${getWaveformLevel(waveformData, index)}%` }}
+              />
+            ))}
+          </div>
+          <div className="progress-track">
+            <span style={{ width: sourceMode === 'file' ? `${Math.round(fileProgress * 100)}%` : undefined }} />
+          </div>
+
+          <div className="subtitle-scroll">
+            {displaySubtitles.length === 0 && !currentInterim.en && (
+              <article className="subtitle-card empty-state">
+                <div className="subtitle-meta">
+                  <time>{copy.ready}</time>
+                  <span>{copy.readyBadge}</span>
+                </div>
+                {shouldShowOriginal(subtitleMode, showOriginal) && (
+                  <p className="source-text">
+                    {copy.readySource}
+                  </p>
+                )}
+                {shouldShowChinese(subtitleMode) && (
+                  <p className="translated-text">{copy.readyZh}</p>
+                )}
+              </article>
+            )}
+            {currentInterim.en && (
+              <article className="subtitle-card interim">
+                <div className="subtitle-meta">
+                  <time>live</time>
+                  <span>{copy.recognizing}</span>
+                </div>
+                {shouldShowOriginal(subtitleMode, showOriginal) && (
+                  <p className="source-text">{currentInterim.en}</p>
+                )}
+                {shouldShowChinese(subtitleMode) && (
+                  <p className="translated-text">{currentInterim.zh || '等待最终识别...'}</p>
+                )}
+              </article>
+            )}
+            {displaySubtitles.map((subtitle) => (
+              <SubtitleCard
+                analysis={qualitySummary.analyses.find((item) => item.subtitle.id === subtitle.id)}
+                isSelected={subtitle.id === selectedSubtitle?.id}
+                key={subtitle.id}
+                onSelect={() => selectSubtitle(subtitle.id)}
+                showOriginal={shouldShowOriginal(subtitleMode, showOriginal)}
+                showChinese={shouldShowChinese(subtitleMode)}
+                subtitle={subtitle}
+              />
+            ))}
+          </div>
+
+          <div className="correction-editor">
+            <div>
+              <h2>{copy.correction}</h2>
+              <p>{selectedSubtitle.en}</p>
+            </div>
+            <textarea
+              className="editor-preview"
+              aria-label="Corrected Chinese subtitle"
+              value={draftZh}
+              onChange={(event) => setDraftZh(event.target.value)}
+            />
+            <button type="button" disabled={!hasSelectedSubtitle} onClick={handleSaveCorrection}>
+              <ClipboardCheck size={15} />
+              {copy.saveCorrection}
+            </button>
+            <button
+              type="button"
+              disabled={!hasSelectedSubtitle}
+              onClick={() => retranslateSubtitle(selectedSubtitle.id)}
+            >
+              <Wand2 size={15} />
+              {copy.retranslate}
+            </button>
+          </div>
+
+          {showBanner && (
+            <div className="subtitle-banner">
+              <span>{copy.currentSubtitle}</span>
+              <strong>{subtitleMode === 'en-only' ? (currentInterim.en || selectedSubtitle.en) : (currentInterim.zh || selectedSubtitle.zh)}</strong>
+            </div>
+          )}
+
+          <footer className="stats-bar">
+            <span>{copy.translated} {displaySubtitles.length}</span>
+            <span>{copy.corrections} {correctionCount}</span>
+            <span>{copy.glossary} {glossary.length}</span>
+            <span>{copy.provider} {provider}</span>
+          </footer>
+        </section>
+      </main>
+
+      {settingsOpen && (
+        <div className="modal-backdrop" role="presentation">
+          <section className="settings-modal" aria-label="Advanced settings">
+            <header>
+              <div>
+                <h2>{copy.advancedSettings}</h2>
+                <p>{copy.advancedHint}</p>
+              </div>
+              <button type="button" onClick={() => setSettingsOpen(false)}>{copy.close}</button>
+            </header>
             <div className="config-tabs" aria-label="Configuration sections">
               <button
                 type="button"
@@ -804,7 +988,7 @@ export default function App() {
                   onChange={(event) => setApiKey(event.target.value)}
                 />
                 <div className="secret-input">
-                  Browser key stays in memory. Server Gateway uses DashScope/OpenAI-compatible keys from .env.
+                  Browser key stays in memory. Server Gateway uses keys from .env.
                 </div>
               </div>
             )}
@@ -821,6 +1005,7 @@ export default function App() {
                   value={asrModel}
                   onChange={(event) => setAsrModel(event.target.value)}
                 >
+                  <option value="qwen3-asr-flash">qwen3-asr-flash</option>
                   <option value="gpt-4o-mini-transcribe">gpt-4o-mini-transcribe</option>
                   <option value="gpt-4o-transcribe">gpt-4o-transcribe</option>
                   <option value="whisper-1">whisper-1</option>
@@ -828,7 +1013,7 @@ export default function App() {
                 <input
                   className="settings-control"
                   aria-label="ASR base URL"
-                  placeholder="https://api.openai.com/v1"
+                  placeholder="https://dashscope.aliyuncs.com/compatible-mode/v1"
                   value={asrBaseUrl}
                   onChange={(event) => setAsrBaseUrl(event.target.value)}
                 />
@@ -840,7 +1025,7 @@ export default function App() {
                   value={asrApiKey}
                   onChange={(event) => setAsrApiKey(event.target.value)}
                 />
-                <div className="secret-input">File and Live modes use /audio/transcriptions</div>
+                <div className="secret-input">File and Live modes use the backend ASR gateway when server key is present.</div>
               </div>
             )}
 
@@ -871,278 +1056,6 @@ export default function App() {
                 </div>
               </div>
             )}
-          </section>
-
-          <section className="panel-block">
-            <h2>Subtitle Settings</h2>
-            <label className="toggle-line">
-              <input
-                checked={showOriginal}
-                type="checkbox"
-                onChange={(event) => setShowOriginal(event.target.checked)}
-              />
-              <span>Show original English</span>
-            </label>
-            <label className="toggle-line">
-              <input
-                checked={showBanner}
-                type="checkbox"
-                onChange={(event) => setShowBanner(event.target.checked)}
-              />
-              <span>Bottom subtitle banner</span>
-            </label>
-            <label className="toggle-line">
-              <input
-                checked={autoCorrect}
-                type="checkbox"
-                onChange={(event) => setAutoCorrect(event.target.checked)}
-              />
-              <span>Auto correction memory</span>
-            </label>
-            <label className="toggle-line">
-              <input
-                checked={voiceOutput}
-                type="checkbox"
-                onChange={(event) => setVoiceOutput(event.target.checked)}
-              />
-              <span>Chinese voice output</span>
-            </label>
-          </section>
-
-          <button className="run-button" type="button" onClick={handleRunClick}>
-            {getRunButtonLabel({ isRunning, sourceMode, isCapturing })}
-          </button>
-        </aside>
-
-        <section className="right-panel" aria-label="Subtitle workspace">
-          {viewMode === 'dashboard' && (
-            <DashboardView
-              correctionCount={correctionCount}
-              displaySubtitles={displaySubtitles}
-              glossary={glossary}
-              qualitySummary={qualitySummary}
-              sourceMode={sourceMode}
-            />
-          )}
-
-          {viewMode === 'terms' && (
-            <TermsMemoryView
-              correctionMemory={correctionMemory}
-              glossary={glossary}
-              qualitySummary={qualitySummary}
-            />
-          )}
-
-          {viewMode === 'workspace' && (
-            <>
-          <div className="toolbar">
-            <div className="mode-tabs">
-              <button
-                type="button"
-                className={subtitleMode === 'bilingual' ? 'active' : ''}
-                onClick={() => setSubtitleMode('bilingual')}
-              >
-                Bilingual
-              </button>
-              <button
-                type="button"
-                className={subtitleMode === 'zh-only' ? 'active' : ''}
-                onClick={() => setSubtitleMode('zh-only')}
-              >
-                ZH only
-              </button>
-              <button
-                type="button"
-                className={subtitleMode === 'en-only' ? 'active' : ''}
-                onClick={() => setSubtitleMode('en-only')}
-              >
-                EN only
-              </button>
-            </div>
-            <div className="toolbar-note">
-              Latency {latencyMs ? `${(latencyMs / 1000).toFixed(1)}s` : '1.8s'} · Context {contextWindow} · ASR {serverHealth.asrProvider ?? (serverHealth.hasOpenAIKey ? 'server' : 'browser')}
-            </div>
-          </div>
-
-          <div className="quality-strip" aria-label="Session quality overview">
-            <div>
-              <span>Readiness</span>
-              <strong>{readinessScore}/{workflowSteps.length}</strong>
-            </div>
-            <div>
-              <span>Real Input</span>
-              <strong>{sourceMode === 'file' && (asrApiKey || hasServerAsrKey) ? 'File ASR' : sourceMode === 'mic' ? 'Mic STT' : sourceMode === 'live' ? 'Live capture' : 'Demo'}</strong>
-            </div>
-            <div>
-              <span>Glossary Hits</span>
-              <strong>{glossaryHitCount} · {qualitySummary.glossaryHitRate}%</strong>
-            </div>
-            <div>
-              <span>Risks</span>
-              <strong>{qualitySummary.riskCount}</strong>
-            </div>
-          </div>
-
-          <div className="demo-guide" aria-label="Demo guide">
-            <div className="demo-guide-copy">
-              <span>{sourceMode === 'demo' ? activeDemoScenario.badge : '实测模式'}</span>
-              <strong>{sourceMode === 'demo' ? activeDemoScenario.title : 'Real input interpretation'}</strong>
-              <p>{getDemoGuideHint({ sourceMode, hasSubtitles, correctionCount })}</p>
-            </div>
-            <div className="demo-proof-grid">
-              {demoGuideItems.map((item) => (
-                <div className={item.done ? 'done' : ''} key={item.label}>
-                  <item.icon size={15} />
-                  <span>{item.label}</span>
-                  <strong>{item.value}</strong>
-                </div>
-              ))}
-            </div>
-          </div>
-
-          <div className="waveform" aria-label="Audio waveform">
-            {Array.from({ length: 36 }).map((_, index) => (
-              <span
-                // eslint-disable-next-line react/no-array-index-key
-                key={index}
-                style={{ '--level': `${getWaveformLevel(waveformData, index)}%` }}
-              />
-            ))}
-          </div>
-          <div className="progress-track">
-            <span style={{ width: sourceMode === 'file' ? `${Math.round(fileProgress * 100)}%` : undefined }} />
-          </div>
-
-          <div className="subtitle-scroll">
-            {displaySubtitles.length === 0 && !currentInterim.en && (
-              <article className="subtitle-card empty-state">
-                <div className="subtitle-meta">
-                  <time>ready</time>
-                  <span>演示待开始</span>
-                </div>
-                {shouldShowOriginal(subtitleMode, showOriginal) && (
-                  <p className="source-text">
-                    Click Start Interpreting to play the built-in English voice stream.
-                  </p>
-                )}
-                {shouldShowChinese(subtitleMode) && (
-                  <p className="translated-text">点击开始后，系统会模拟外语音频输入，并流式生成中文字幕。</p>
-                )}
-              </article>
-            )}
-            {currentInterim.en && (
-              <article className="subtitle-card interim">
-                <div className="subtitle-meta">
-                  <time>live</time>
-                  <span>识别中</span>
-                </div>
-                {shouldShowOriginal(subtitleMode, showOriginal) && (
-                  <p className="source-text">{currentInterim.en}</p>
-                )}
-                {shouldShowChinese(subtitleMode) && (
-                  <p className="translated-text">{currentInterim.zh || '等待最终识别...'}</p>
-                )}
-              </article>
-            )}
-            {displaySubtitles.map((subtitle) => (
-              <SubtitleCard
-                analysis={qualitySummary.analyses.find((item) => item.subtitle.id === subtitle.id)}
-                isSelected={subtitle.id === selectedSubtitle?.id}
-                key={subtitle.id}
-                onSelect={() => selectSubtitle(subtitle.id)}
-                showOriginal={shouldShowOriginal(subtitleMode, showOriginal)}
-                showChinese={shouldShowChinese(subtitleMode)}
-                subtitle={subtitle}
-              />
-            ))}
-          </div>
-
-          <div className="review-panel">
-            <section>
-              <h2><AlertTriangle size={15} /> Risk Review</h2>
-              {qualitySummary.risky.length === 0 ? (
-                <p className="review-empty">暂无高风险字幕。生成字幕后会自动检查漏译、术语和占位问题。</p>
-              ) : (
-                <div className="review-list">
-                  {qualitySummary.risky.slice(0, 3).map((item) => (
-                    <button type="button" key={item.subtitle.id} onClick={() => selectSubtitle(item.subtitle.id)}>
-                      <strong>{item.subtitle.timeLabel}</strong>
-                      <span>{item.issues.find((issue) => !issue.positive)?.detail}</span>
-                    </button>
-                  ))}
-                </div>
-              )}
-            </section>
-            <section>
-              <h2><BadgeCheck size={15} /> Correction Memory</h2>
-              {correctionMemory.length === 0 ? (
-                <p className="review-empty">保存人工修正后，这里会沉淀为后续翻译参考。</p>
-              ) : (
-                <div className="memory-list">
-                  {correctionMemory.slice(-3).map((record) => (
-                    <div key={record.id}>
-                      <span>{record.en}</span>
-                      <strong>{record.afterZh}</strong>
-                    </div>
-                  ))}
-                </div>
-              )}
-            </section>
-          </div>
-
-          <div className="correction-editor">
-            <div>
-              <h2>Correction Desk</h2>
-              <p>{selectedSubtitle.en}</p>
-            </div>
-            <textarea
-              className="editor-preview"
-              aria-label="Corrected Chinese subtitle"
-              value={draftZh}
-              onChange={(event) => setDraftZh(event.target.value)}
-            />
-            <button type="button" disabled={!hasSelectedSubtitle} onClick={handleSaveCorrection}>
-              <ClipboardCheck size={15} />
-              Save correction
-            </button>
-            <button
-              type="button"
-              disabled={!hasSelectedSubtitle}
-              onClick={() => retranslateSubtitle(selectedSubtitle.id)}
-            >
-              <Wand2 size={15} />
-              Retranslate with glossary
-            </button>
-          </div>
-
-          {showBanner && (
-            <div className="subtitle-banner">
-              <span>{subtitleMode === 'en-only' ? 'Current English Subtitle' : 'Current Chinese Subtitle'}</span>
-              <strong>{subtitleMode === 'en-only' ? (currentInterim.en || selectedSubtitle.en) : (currentInterim.zh || selectedSubtitle.zh)}</strong>
-            </div>
-          )}
-
-          <footer className="stats-bar">
-            <span>Translated {displaySubtitles.length}</span>
-            <span>Corrections {correctionCount}</span>
-            <span>Glossary {glossary.length}</span>
-            <span>Provider {provider}</span>
-          </footer>
-            </>
-          )}
-        </section>
-      </main>
-
-      {settingsOpen && (
-        <div className="modal-backdrop" role="presentation">
-          <section className="settings-modal" aria-label="Advanced settings">
-            <header>
-              <div>
-                <h2>Advanced Settings</h2>
-                <p>实时影响后续翻译，不需要重启会话。</p>
-              </div>
-              <button type="button" onClick={() => setSettingsOpen(false)}>Close</button>
-            </header>
             <label>
               <span>翻译语言</span>
               <select value={targetLanguage} onChange={(event) => setTargetLanguage(event.target.value)}>
@@ -1204,142 +1117,43 @@ export default function App() {
                 <option value="openai">OpenAI TTS（预留）</option>
               </select>
             </label>
+            <div className="settings-toggles">
+              <label className="modal-toggle">
+                <input
+                  checked={showOriginal}
+                  type="checkbox"
+                  onChange={(event) => setShowOriginal(event.target.checked)}
+                />
+                <span>Show original English</span>
+              </label>
+              <label className="modal-toggle">
+                <input
+                  checked={showBanner}
+                  type="checkbox"
+                  onChange={(event) => setShowBanner(event.target.checked)}
+                />
+                <span>Bottom subtitle banner</span>
+              </label>
+              <label className="modal-toggle">
+                <input
+                  checked={autoCorrect}
+                  type="checkbox"
+                  onChange={(event) => setAutoCorrect(event.target.checked)}
+                />
+                <span>Auto correction memory</span>
+              </label>
+              <label className="modal-toggle">
+                <input
+                  checked={voiceOutput}
+                  type="checkbox"
+                  onChange={(event) => setVoiceOutput(event.target.checked)}
+                />
+                <span>Chinese voice output</span>
+              </label>
+            </div>
           </section>
         </div>
       )}
-    </div>
-  );
-}
-
-function DashboardView({
-  correctionCount,
-  displaySubtitles,
-  glossary,
-  qualitySummary,
-  sourceMode,
-}) {
-  const confirmedCount = displaySubtitles.filter((subtitle) => subtitle.corrected).length;
-  const glossaryHitCount = displaySubtitles.filter((subtitle) => subtitle.termsApplied.length > 0).length;
-  const exportReady = displaySubtitles.length > 0 ? 'Ready' : 'Waiting';
-
-  return (
-    <div className="dashboard-view" aria-label="Review and project dashboard">
-      <section className="dashboard-hero">
-        <div>
-          <span>复盘与项目管理</span>
-          <h2>同传会话质量总览</h2>
-          <p>把当前字幕、风险、术语命中和人工修正汇总成可交付的复盘视图，便于录屏讲解和最终提交说明。</p>
-        </div>
-        <div className="dashboard-score">
-          <strong>{Math.max(0, 100 - qualitySummary.riskCount * 7).toFixed(1)}</strong>
-          <span>Session score</span>
-        </div>
-      </section>
-
-      <div className="dashboard-metrics">
-        <MetricCard label="Input mode" value={sourceMode.toUpperCase()} note="当前演示输入源" />
-        <MetricCard label="Captions" value={displaySubtitles.length} note="已生成字幕条数" />
-        <MetricCard label="Corrections" value={correctionCount || confirmedCount} note="人工修正沉淀" />
-        <MetricCard label="Glossary hits" value={glossaryHitCount} note={`${glossary.length} terms loaded`} />
-        <MetricCard label="Risk flags" value={qualitySummary.riskCount} note="质量诊断风险项" />
-        <MetricCard label="Export" value={exportReady} note="SRT / Review / Copy" />
-      </div>
-
-      <div className="dashboard-grid">
-        <section className="ops-panel">
-          <h2>质量诊断队列</h2>
-          {qualitySummary.risky.length === 0 ? (
-            <p className="review-empty">暂无高风险字幕。演示中可通过术语或人工修正触发复盘证据。</p>
-          ) : (
-            <div className="ops-list">
-              {qualitySummary.risky.slice(0, 5).map((item) => (
-                <div key={item.subtitle.id}>
-                  <span>{item.subtitle.timeLabel}</span>
-                  <strong>{item.issues.find((issue) => !issue.positive)?.detail}</strong>
-                </div>
-              ))}
-            </div>
-          )}
-        </section>
-
-        <section className="ops-panel">
-          <h2>最终提交证据</h2>
-          <div className="submission-checks">
-            <span className={displaySubtitles.length ? 'done' : ''}>字幕生成</span>
-            <span className={correctionCount ? 'done' : ''}>翻译修正</span>
-            <span className={glossary.length ? 'done' : ''}>术语表</span>
-            <span className={displaySubtitles.length ? 'done' : ''}>导出闭环</span>
-          </div>
-        </section>
-      </div>
-    </div>
-  );
-}
-
-function TermsMemoryView({ correctionMemory, glossary, qualitySummary }) {
-  return (
-    <div className="terms-view" aria-label="Terms and correction memory">
-      <section className="dashboard-hero">
-        <div>
-          <span>术语与记忆库</span>
-          <h2>翻译修正沉淀</h2>
-          <p>术语表和人工修正共同影响后续重译，是本项目区别于普通翻译 API Demo 的核心闭环。</p>
-        </div>
-        <div className="dashboard-score compact">
-          <strong>{glossary.length}</strong>
-          <span>Terms</span>
-        </div>
-      </section>
-
-      <div className="terms-layout">
-        <section className="ops-panel">
-          <h2>当前术语表</h2>
-          <div className="terms-table">
-            {glossary.map((term) => (
-              <div key={term.id ?? term.source}>
-                <span>{term.source}</span>
-                <strong>{term.target}</strong>
-                <em>{term.enabled ? '实时生效' : '停用'}</em>
-              </div>
-            ))}
-          </div>
-        </section>
-
-        <section className="ops-panel">
-          <h2>Correction Memory</h2>
-          {correctionMemory.length === 0 ? (
-            <p className="review-empty">还没有保存人工修正。点击任意字幕并保存译文后，这里会出现修正记忆。</p>
-          ) : (
-            <div className="ops-list">
-              {correctionMemory.slice(-6).map((record) => (
-                <div key={record.id}>
-                  <span>{record.en}</span>
-                  <strong>{record.afterZh}</strong>
-                </div>
-              ))}
-            </div>
-          )}
-        </section>
-
-        <section className="ops-panel wide">
-          <h2>术语命中与风险</h2>
-          <div className="submission-checks">
-            <span className={qualitySummary.glossaryHitRate > 0 ? 'done' : ''}>Glossary hit {qualitySummary.glossaryHitRate}%</span>
-            <span className={qualitySummary.riskCount === 0 ? 'done' : ''}>Risk flags {qualitySummary.riskCount}</span>
-            <span className={correctionMemory.length ? 'done' : ''}>Memory {correctionMemory.length}</span>
-          </div>
-        </section>
-      </div>
-    </div>
-  );
-}
-
-function MetricCard({ label, note, value }) {
-  return (
-    <div className="metric-card">
-      <span>{label}</span>
-      <strong>{value}</strong>
-      <small>{note}</small>
     </div>
   );
 }
@@ -1455,24 +1269,6 @@ function StageRail({ activeStage, stages }) {
   );
 }
 
-function buildWorkflowSteps({ sourceMode, fileMeta, asrApiKey, serverHasApiKey, apiKey, provider, hasSubtitles, correctionCount }) {
-  const inputReady = sourceMode === 'demo'
-    || sourceMode === 'mic'
-    || sourceMode === 'live'
-    || Boolean(fileMeta);
-  const recognitionReady = sourceMode === 'file' || sourceMode === 'live'
-    ? Boolean(asrApiKey || serverHasApiKey)
-    : true;
-
-  return [
-    { label: 'Input', icon: sourceMode === 'file' ? FileAudio : sourceMode === 'mic' ? Mic : sourceMode === 'live' ? Radio : Sparkles, done: inputReady },
-    { label: 'ASR', icon: Captions, done: recognitionReady },
-    { label: 'Translate', icon: Wand2, done: Boolean(apiKey) || (provider === 'openai' && serverHasApiKey) || sourceMode === 'demo' || hasSubtitles },
-    { label: 'Correct', icon: BadgeCheck, done: correctionCount > 0 },
-    { label: 'Export', icon: ClipboardCheck, done: hasSubtitles },
-  ];
-}
-
 function getNextAction({
   sourceMode,
   fileMeta,
@@ -1493,57 +1289,10 @@ function getNextAction({
   return '当前闭环已跑通，可以导出 SRT 或继续添加术语重译。';
 }
 
-function buildDemoGuideItems({
-  sourceMode,
-  activeDemoScenario,
-  hasSubtitles,
-  glossaryHitCount,
-  correctionCount,
-  correctionMemory,
-  qualitySummary,
-}) {
-  return [
-    {
-      label: '输入流',
-      value: sourceMode === 'demo' ? activeDemoScenario.label : sourceMode,
-      icon: sourceMode === 'demo' ? Sparkles : sourceMode === 'file' ? FileAudio : sourceMode === 'live' ? Radio : Mic,
-      done: hasSubtitles,
-    },
-    {
-      label: '术语',
-      value: glossaryHitCount > 0 ? `${glossaryHitCount} hits` : `${activeDemoScenario.terms.length} ready`,
-      icon: Languages,
-      done: glossaryHitCount > 0,
-    },
-    {
-      label: '修正',
-      value: correctionCount > 0 ? `${correctionCount} saved` : '待修正',
-      icon: BadgeCheck,
-      done: correctionMemory.length > 0,
-    },
-    {
-      label: '复盘',
-      value: hasSubtitles ? `${qualitySummary.riskCount} risks` : '待导出',
-      icon: ClipboardCheck,
-      done: hasSubtitles,
-    },
-  ];
-}
-
-function getDemoGuideHint({ sourceMode, hasSubtitles, correctionCount }) {
-  if (sourceMode !== 'demo') return '真实输入模式会复用同一套字幕、修正、术语和导出工作台。';
-  if (!hasSubtitles) return '先选择一个场景并点击开始，观察英文语音流如何逐句变成中文字幕。';
-  if (correctionCount === 0) return '下一步点击一条字幕，在 Correction Desk 保存一次人工修正。';
-  return '闭环已跑通，可以导出 SRT 或 Review 报告作为演示证据。';
-}
-
-function getRunButtonLabel({ isRunning, sourceMode, isCapturing }) {
+function getRunButtonLabel({ isRunning, sourceMode, isCapturing, copy }) {
   if (isRunning) return 'Stop Interpreting';
-  if (sourceMode === 'demo') return 'Start Demo Interpretation';
-  if (sourceMode === 'mic') return 'Start Mic STT';
-  if (sourceMode === 'file') return 'Transcribe Uploaded File';
-  if (sourceMode === 'live') return isCapturing ? 'Stop Live Capture' : 'Choose Live Audio';
-  return 'Start Interpreting';
+  if (sourceMode === 'live') return isCapturing ? copy.stopLive : copy.chooseLive;
+  return copy.start;
 }
 
 function getLivePrimaryAction({ isCapturing, liveStage, hasLiveAsr }) {
