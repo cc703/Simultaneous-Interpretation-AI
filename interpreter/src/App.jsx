@@ -34,6 +34,7 @@ import {
   initTTS,
   cancelTTS,
   setTTSEnabled,
+  setTTSLanguage,
   setTTSRate,
 } from './engine/index.js';
 import { useStore } from './store/index.js';
@@ -53,6 +54,16 @@ const SAMPLE_TRANSCRIPT = [
   'If a phrase is translated incorrectly, the user can correct it immediately.',
   'At the end, the bilingual transcript can be exported for review.',
 ].join(' ');
+
+const TARGET_LANGUAGES = [
+  { value: 'zh-CN', zh: '中文', en: 'Chinese' },
+  { value: 'zh-TW', zh: '繁体中文', en: 'Traditional Chinese' },
+  { value: 'en', zh: '英文', en: 'English' },
+  { value: 'ja', zh: '日文', en: 'Japanese' },
+  { value: 'ko', zh: '韩文', en: 'Korean' },
+  { value: 'fr', zh: '法文', en: 'French' },
+  { value: 'es', zh: '西班牙文', en: 'Spanish' },
+];
 
 const UI_COPY = {
   zh: {
@@ -75,6 +86,9 @@ const UI_COPY = {
     chooseLive: '选择直播音频',
     stopLive: '停止直播捕获',
     subtitles: '字幕',
+    sourceLanguage: '源语言',
+    autoDetect: '自动检测',
+    targetLanguage: '目标语言',
     bilingual: '双语',
     zhOnly: '只看中文',
     enOnly: '只看英文',
@@ -120,6 +134,9 @@ const UI_COPY = {
     chooseLive: 'Choose live audio',
     stopLive: 'Stop live capture',
     subtitles: 'Captions',
+    sourceLanguage: 'Source',
+    autoDetect: 'Auto detect',
+    targetLanguage: 'Target',
     bilingual: 'Bilingual',
     zhOnly: 'Chinese',
     enOnly: 'English',
@@ -279,6 +296,10 @@ export default function App() {
   useEffect(() => {
     setTTSEnabled(voiceOutput);
   }, [voiceOutput]);
+
+  useEffect(() => {
+    setTTSLanguage(targetLanguage);
+  }, [targetLanguage]);
 
   useEffect(() => {
     setTTSRate(ttsRate);
@@ -791,6 +812,26 @@ export default function App() {
               <span>{copy.subtitles}</span>
               <strong>{sourceMode === 'file' ? copy.file : sourceMode === 'live' ? copy.live : sourceMode === 'mic' ? copy.mic : copy.demo}</strong>
             </div>
+            <div className="language-route" aria-label="Language route">
+              <div>
+                <span>{copy.sourceLanguage}</span>
+                <strong>{copy.autoDetect}</strong>
+              </div>
+              <span aria-hidden="true">→</span>
+              <label>
+                <span>{copy.targetLanguage}</span>
+                <select
+                  value={targetLanguage}
+                  onChange={(event) => setTargetLanguage(event.target.value)}
+                >
+                  {TARGET_LANGUAGES.map((language) => (
+                    <option key={language.value} value={language.value}>
+                      {language[uiLanguage]}
+                    </option>
+                  ))}
+                </select>
+              </label>
+            </div>
             <div className="mode-tabs">
               <button
                 type="button"
@@ -1057,10 +1098,13 @@ export default function App() {
               </div>
             )}
             <label>
-              <span>翻译语言</span>
+              <span>{copy.targetLanguage}</span>
               <select value={targetLanguage} onChange={(event) => setTargetLanguage(event.target.value)}>
-                <option value="zh-CN">{'英语 -> 中文（简体）'}</option>
-                <option value="zh-TW">{'英语 -> 中文（繁体）'}</option>
+                {TARGET_LANGUAGES.map((language) => (
+                  <option key={language.value} value={language.value}>
+                    {language[uiLanguage]}
+                  </option>
+                ))}
               </select>
             </label>
             <label>

@@ -24,7 +24,7 @@ export const PROVIDER_CONFIGS = {
 export function buildContext(subtitles, windowSize = 6) {
   return subtitles
     .slice(-windowSize)
-    .map((subtitle) => `EN: ${subtitle.en}\nZH: ${subtitle.zh}`)
+    .map((subtitle) => `SOURCE: ${subtitle.en}\nTARGET: ${subtitle.zh}`)
     .join('\n---\n');
 }
 
@@ -41,7 +41,7 @@ export function buildCorrectionMemoryPrompt(correctionHistory, subtitles) {
     .map((record) => {
       const subtitle = subtitles.find((item) => item.id === record.subtitleId);
       if (!subtitle?.en || !record.afterZh) return '';
-      return `EN: ${subtitle.en}\n用户确认译文: ${record.afterZh}`;
+      return `SOURCE: ${subtitle.en}\n用户确认译文: ${record.afterZh}`;
     })
     .filter(Boolean)
     .join('\n---\n');
@@ -117,13 +117,13 @@ export function buildSystemPrompt({
   }[translationStyle] ?? translationStyle;
 
   return [
-    '你是一名专业同声传译员。将用户提供的英文片段翻译成自然流畅的中文。',
+    '你是一名专业同声传译员。自动判断用户输入片段的源语言，并翻译成目标语言。',
     '',
     '规则：',
     '1. 直接输出译文，不加任何解释或前缀。',
-    '2. 保持专业术语准确性。',
+    '2. 不需要用户指定源语言；如果输入里混合多种语言，请根据上下文逐句判断。',
     `3. 目标语言：${targetLanguage}。翻译风格：${styleLabel}。`,
-    '4. 如果术语表中出现匹配项，必须优先使用指定中文译法。',
+    '4. 保持专业术语准确性。如果术语表中出现匹配项，必须优先使用指定译法。',
     '5. 如果用户修正记忆中出现相似表达，优先沿用用户确认过的表达方式。',
     '',
     '上下文参考：',

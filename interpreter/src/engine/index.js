@@ -31,6 +31,7 @@ export {
   enqueueTTS,
   initTTS,
   setTTSEnabled,
+  setTTSLanguage,
   setTTSRate,
 } from './tts.js';
 export {

@@ -1716,6 +1716,47 @@ body {
   font-size: 20px;
 }
 
+.language-route {
+  display: inline-flex;
+  align-items: center;
+  gap: 10px;
+  min-width: 280px;
+  padding: 5px 6px 5px 12px;
+  border: 1px solid rgba(148, 163, 184, 0.14);
+  border-radius: 999px;
+  background: rgba(2, 6, 23, 0.42);
+}
+
+.language-route div,
+.language-route label {
+  display: grid;
+  gap: 2px;
+  min-width: 0;
+}
+
+.language-route span {
+  color: var(--muted);
+  font-size: 11px;
+  line-height: 1;
+}
+
+.language-route strong {
+  color: #e5eefc;
+  font-size: 13px;
+  white-space: nowrap;
+}
+
+.language-route select {
+  min-width: 104px;
+  height: 30px;
+  border: 0;
+  border-radius: 999px;
+  padding: 0 28px 0 12px;
+  color: #06111f;
+  background: #e5eefc;
+  font-weight: 850;
+}
+
 .waveform {
   padding: 0 24px;
   border-bottom-color: rgba(148, 163, 184, 0.1);
@@ -1791,6 +1832,11 @@ body {
 
   .right-panel {
     grid-template-rows: auto 56px 3px minmax(260px, 50vh) auto auto auto;
+  }
+
+  .language-route {
+    width: 100%;
+    justify-content: space-between;
   }
 
   .correction-editor {
