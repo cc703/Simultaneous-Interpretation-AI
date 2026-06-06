@@ -10,7 +10,7 @@
 
 PR-14：演示材料与提交文案完善。
 
-当前已建立 Vite + React 前端工程和 Node 后端代理，完成同传字幕工作台、Web Speech API STT、OpenAI-compatible 流式翻译、DashScope Qwen-ASR 后端代理、翻译修正闭环、稳定 Demo 模式、文件上传真实转写、直播标签页/屏幕音频捕获与 MediaRecorder 分片 ASR、高级设置、Web Audio 波形、浏览器 TTS、SRT / 双语文本导出。页面包含输入源选择、语言路由、Provider 配置、File/Live ASR 配置、演示场景/术语预设、时间轴字幕流、按需出现的修正编辑器、底部字幕预览和统计栏。
+当前已建立 Vite + React 前端工程和 Node 后端代理，完成同传字幕工作台、Web Speech API STT、OpenAI-compatible 流式翻译、DashScope Qwen-ASR 后端代理、翻译修正闭环、稳定 Demo 模式、文件上传真实转写、直播标签页/屏幕音频捕获与 MediaRecorder 分片 ASR、直播字幕浮窗、高级设置、Web Audio 波形、浏览器 TTS、SRT / 双语文本导出。页面包含输入源选择、语言路由、Provider 配置、File/Live ASR 配置、演示场景/术语预设、时间轴字幕流、按需出现的修正编辑器、底部字幕预览和统计栏。
 
 Demo 视频：待录制，提交前替换为公开可访问链接。
 
@@ -128,8 +128,9 @@ Chrome 或 Edge 中打开本地页面，点击输入源 `麦克风`，再点击 
 3. 推荐启动已配置 `DASHSCOPE_API_KEY` 的本地后端代理；Live 会复用同一套 `/api/transcribe` 配置。若使用 OpenAI ASR，可把 `.env` 中 `ASR_PROVIDER` 改为 `openai`。
 4. 点击 `选择直播音频`，选择一个带英文音频的浏览器标签页或屏幕，并确认共享音频。
 5. 左侧会显示捕获来源、权限状态、ASR 配置状态、分片长度、字幕输出状态和 Live 统计。
-6. 如果浏览器支持 MediaRecorder，系统会按设置的音频分片长度持续转写直播音频，并把转写文本送入翻译链路。
-7. 未填写浏览器 ASR Key 且后端没有配置 Key 时，Live 只展示捕获、波形和配置缺口，不会伪装为真实转写。
+6. 点击顶部 `浮窗` 可打开字幕浮窗；Chromium 支持时会使用 Document Picture-in-Picture，用户可以切回直播/会议页面并把字幕浮窗放在画面上方。
+7. 如果浏览器支持 MediaRecorder，系统会按设置的音频分片长度持续转写直播音频，并把转写文本送入翻译链路。
+8. 未填写浏览器 ASR Key 且后端没有配置 Key 时，Live 只展示捕获、波形和配置缺口，不会伪装为真实转写。
 
 ## 设置面板验证
 
@@ -143,6 +144,7 @@ Chrome 或 Edge 中打开本地页面，点击输入源 `麦克风`，再点击 
 - 右上 `双语` / `目标语言` / `检测语言` 会实时切换字幕展示方式。
 - `Settings` 可控制是否显示源语言原文、底部字幕预览、修正记忆和语音输出。
 - 关闭自动修正记忆后，后续真实翻译不会注入人工修正记忆。
+- 顶部 `浮窗` 会打开独立字幕窗口，跟随当前字幕模式同步显示；不支持 Document Picture-in-Picture 的浏览器会降级为普通弹出窗口。
 
 ## 波形验证
 
@@ -185,6 +187,7 @@ Chrome 或 Edge 中打开本地页面，点击输入源 `麦克风`，再点击 
 - 真实浏览器能力：Mic 使用 Web Speech API 做英文语音识别；File 模式可通过本地 Gateway 调用 DashScope 或可选 OpenAI ASR 做真实文件转写；Live 模式可通过 MediaRecorder 分片调用 ASR；Provider 配置后可走真实 OpenAI-compatible 流式翻译。
 - 翻译修正能力：人工修正会写入修正记忆，并作为后续翻译提示的一部分；质量诊断可提示漏译、术语未命中和占位翻译。
 - 能力限制：Live ASR 依赖浏览器 MediaRecorder、用户共享音频权限、ASR Key 和网络质量；分片转写不是毫秒级实时，适合 4 秒左右的准实时字幕。
+- 浮窗边界：字幕浮窗是浏览器 Picture-in-Picture 或弹出窗口能力，不直接注入或修改第三方直播、会议、媒体网站的页面结构。
 
 ## 已完成 PR 记录
 

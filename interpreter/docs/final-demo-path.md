@@ -65,8 +65,9 @@ npm run smoke:final
 3. 讲解 Live 路径：`选择直播源 -> 捕获浏览器音频 -> 分片 ASR -> 目标语言字幕 -> 修正导出`。
 4. 点击 `选择直播音频`。
 5. 选择带英文音频的网页直播、社交平台直播、媒体直播或会议标签页，并确认共享音频。
-6. 如果未配置 ASR Key，讲解状态会停在 `Audio captured · ASR not configured`：系统已捕获直播音频和波形，但不会生成假字幕。
-7. 如果 ASR Key 可用，讲解 Live 统计：`Queued`、`Done`、`Silent`、`Dup`、`Latency`。系统会跳过过短/静音片段，并对重复转写做去重，避免字幕刷屏。
+6. 点击顶部 `浮窗`，打开字幕浮窗，再切回直播页面，把浮窗放在视频画面上方。
+7. 如果未配置 ASR Key，讲解状态会停在 `Audio captured · ASR not configured`：系统已捕获直播音频和波形，但不会生成假字幕。
+8. 如果 ASR Key 可用，讲解 Live 统计：`Queued`、`Done`、`Silent`、`Dup`、`Latency`。系统会跳过过短/静音片段，并对重复转写做去重，避免字幕刷屏。
 
 ## 6. 导出
 
@@ -80,4 +81,5 @@ npm run smoke:final
 - File / Live 真实 ASR 依赖后端 provider、Key、网络和供应商能力。
 - Live 面向真实网页/社交/媒体直播和线上会议；用户必须主动授权浏览器共享音频。
 - Live 是几秒级准实时分片，不承诺零延迟。
+- 字幕浮窗依赖浏览器 Picture-in-Picture 或弹出窗口，不直接修改第三方直播网页。
 - 当前前端单文件建议 25MB 内；DashScope inline 音频建议 10MB 内。

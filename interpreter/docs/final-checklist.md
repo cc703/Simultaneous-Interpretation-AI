@@ -41,6 +41,7 @@
 - [ ] File 模式未填写 ASR Key 时，页面明确提示配置缺口，不伪装真实转写。
 - [ ] Live 模式可通过 `选择直播音频` 请求标签页/屏幕音频。
 - [ ] Live 模式填写 ASR Key 后会显示 Source、Permission、ASR、Queued、Done、Silent、Dup、Latency。
+- [ ] 点击顶部 `浮窗` 后，字幕可在独立窗口中同步显示；切回直播页面时可把浮窗覆盖在画面上方。
 - [ ] 停止 Live 捕获后音频 track 被释放，状态不再继续转写。
 - [ ] Live 只处理音频，不做画面理解。
 
@@ -49,6 +50,7 @@
 - [ ] README 写明选择题目二。
 - [ ] README 写明 Demo 视频链接占位，提交前替换为公开视频链接。
 - [ ] 不声称直播是毫秒级无延迟同传。
+- [ ] 不声称系统会直接修改第三方直播网页；字幕浮窗依赖浏览器 Picture-in-Picture 或弹出窗口。
 - [ ] 不声称前端可无限制处理任意大小文件。
 - [ ] 说明 API Key 仅保存在内存，不写入 localStorage。
 - [ ] `.env`、API Key、日志和 `ui.txt` 不进入仓库。

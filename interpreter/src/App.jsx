@@ -83,6 +83,7 @@ const UI_COPY = {
     settings: '设置',
     export: '导出',
     copy: '复制',
+    overlay: '浮窗',
     source: '输入源',
     demoPreset: '演示场景 / 术语预设',
     demoPresetHint: '仅用于内置演示：切换样本内容与场景术语。',
@@ -122,6 +123,7 @@ const UI_COPY = {
     provider: '引擎',
     liveBoundary: 'Live 为几秒级准实时分片；无 ASR Key 时只显示捕获状态，不生成假字幕。',
     liveUse: '适用于网页直播、社交直播、媒体直播和线上会议。',
+    overlayHint: '打开字幕浮窗后，可以切到直播/会议页面观看，字幕会继续同步。',
     advancedSettings: '高级设置',
     advancedHint: '这些配置会影响后续识别、翻译和播报。',
     close: '关闭',
@@ -133,6 +135,7 @@ const UI_COPY = {
     settings: 'Settings',
     export: 'Export',
     copy: 'Copy',
+    overlay: 'Overlay',
     source: 'Source',
     demoPreset: 'Demo scene / glossary preset',
     demoPresetHint: 'For built-in demo only: switches sample content and scenario terms.',
@@ -172,6 +175,7 @@ const UI_COPY = {
     provider: 'Provider',
     liveBoundary: 'Live uses short near-real-time chunks. Without ASR credentials, it shows capture state only.',
     liveUse: 'For web streams, social live rooms, media streams, and online meetings.',
+    overlayHint: 'Open the caption overlay, then switch back to the stream tab. Captions keep syncing.',
     advancedSettings: 'Advanced settings',
     advancedHint: 'These settings affect later recognition, translation, and voice output.',
     close: 'Close',
@@ -254,9 +258,11 @@ export default function App() {
   const [liveStats, setLiveStats] = useState({ queued: 0, processed: 0, skipped: 0, duplicates: 0, lastLatencyMs: 0 });
   const [serverHealth, setServerHealth] = useState({ ok: false, hasOpenAIKey: false });
   const [settingsOpen, setSettingsOpen] = useState(false);
+  const [captionOverlayOpen, setCaptionOverlayOpen] = useState(false);
   const [configTab, setConfigTab] = useState('translate');
   const [uiLanguage, setUiLanguage] = useState('zh');
   const audioRef = useRef(null);
+  const captionWindowRef = useRef(null);
   const copy = UI_COPY[uiLanguage];
   const displaySubtitles = subtitles;
   const hasSubtitles = displaySubtitles.length > 0;
@@ -296,6 +302,36 @@ export default function App() {
       }
   ), [displaySubtitles, selectedSubtitleId]);
   const hasSelectedSubtitle = selectedSubtitle.id !== 'empty';
+  const latestSubtitle = useMemo(() => (
+    displaySubtitles.find((subtitle) => subtitle.isCurrent)
+      ?? displaySubtitles.at(-1)
+      ?? null
+  ), [displaySubtitles]);
+  const captionOverlayPayload = useMemo(() => buildCaptionOverlayPayload({
+    copy,
+    currentInterim,
+    latestSubtitle,
+    subtitleMode,
+    sourceLanguage,
+    targetLanguage,
+    sourceMode,
+    captureSourceLabel,
+    liveStage,
+    liveStats,
+    isCapturing,
+  }), [
+    copy,
+    currentInterim,
+    latestSubtitle,
+    subtitleMode,
+    sourceLanguage,
+    targetLanguage,
+    sourceMode,
+    captureSourceLabel,
+    liveStage,
+    liveStats,
+    isCapturing,
+  ]);
 
   useEffect(() => {
     if (glossary.length === 0) {
@@ -326,6 +362,16 @@ export default function App() {
   useEffect(() => {
     setDraftZh(selectedSubtitle?.zh ?? '');
   }, [selectedSubtitle?.id, selectedSubtitle?.zh]);
+
+  useEffect(() => {
+    updateCaptionOverlay(captionWindowRef.current, captionOverlayPayload);
+  }, [captionOverlayPayload]);
+
+  useEffect(() => () => {
+    if (captionWindowRef.current && !captionWindowRef.current.closed) {
+      captionWindowRef.current.close();
+    }
+  }, []);
 
   useEffect(() => () => {
     if (fileUrl) URL.revokeObjectURL(fileUrl);
@@ -476,6 +522,29 @@ export default function App() {
   const handleCopy = async () => {
     if (!hasSubtitles) return;
     await copyBilingual(displaySubtitles);
+  };
+
+  const handleCaptionOverlay = async () => {
+    const existingWindow = captionWindowRef.current;
+    if (existingWindow && !existingWindow.closed) {
+      existingWindow.close();
+      captionWindowRef.current = null;
+      setCaptionOverlayOpen(false);
+      return;
+    }
+
+    try {
+      const overlayWindow = await openCaptionOverlayWindow();
+      captionWindowRef.current = overlayWindow;
+      setCaptionOverlayOpen(true);
+      mountCaptionOverlay(overlayWindow, () => {
+        captionWindowRef.current = null;
+        setCaptionOverlayOpen(false);
+      });
+      updateCaptionOverlay(overlayWindow, captionOverlayPayload);
+    } catch (error) {
+      console.warn('[caption-overlay] failed:', error);
+    }
   };
 
   const loadFile = (file, status = '') => {
@@ -631,6 +700,14 @@ export default function App() {
           <button type="button" onClick={() => setSettingsOpen(true)}>
             <Settings size={15} />
             {copy.settings}
+          </button>
+          <button
+            type="button"
+            className={captionOverlayOpen ? 'active' : ''}
+            onClick={handleCaptionOverlay}
+          >
+            <Captions size={15} />
+            {captionOverlayOpen ? copy.close : copy.overlay}
           </button>
           <button type="button" disabled={!hasSubtitles} onClick={handleExport}>{copy.export}</button>
           <button type="button" disabled={!hasSubtitles} onClick={handleCopy}>{copy.copy}</button>
@@ -806,6 +883,9 @@ export default function App() {
                 </div>
                 <div className="live-boundary">
                   {copy.liveBoundary}
+                </div>
+                <div className="live-boundary overlay-note">
+                  {copy.overlayHint}
                 </div>
                 <div className="live-stats" aria-label="Live ASR queue statistics">
                   <span><strong>{liveStats.queued}</strong> Queued</span>
@@ -1400,4 +1480,174 @@ function shouldShowOriginal(subtitleMode, showOriginal) {
 
 function shouldShowChinese(subtitleMode) {
   return subtitleMode !== 'en-only';
+}
+
+async function openCaptionOverlayWindow() {
+  if ('documentPictureInPicture' in window) {
+    return window.documentPictureInPicture.requestWindow({
+      width: 760,
+      height: 240,
+    });
+  }
+
+  const popup = window.open('', 'simulcast-caption-overlay', 'popup,width=760,height=240');
+  if (!popup) {
+    throw new Error('Caption overlay popup was blocked by the browser.');
+  }
+  return popup;
+}
+
+function mountCaptionOverlay(overlayWindow, onClose) {
+  const documentRef = overlayWindow.document;
+  documentRef.open();
+  documentRef.write(`<!doctype html>
+    <html lang="zh-CN">
+      <head>
+        <meta charset="utf-8" />
+        <meta name="viewport" content="width=device-width, initial-scale=1" />
+        <title>Simulcast Captions</title>
+      </head>
+      <body>
+        <main id="caption-overlay-root" class="caption-overlay-window"></main>
+      </body>
+    </html>`);
+  documentRef.close();
+  const style = documentRef.createElement('style');
+  style.textContent = `
+    :root {
+      color-scheme: dark;
+      --overlay-bg: rgba(3, 7, 18, 0.88);
+      --overlay-border: rgba(148, 163, 184, 0.22);
+      --overlay-text: #f8fafc;
+      --overlay-muted: #94a3b8;
+      --overlay-accent: #60a5fa;
+      --overlay-green: #34d399;
+    }
+    * { box-sizing: border-box; }
+    html, body {
+      width: 100%;
+      min-height: 100%;
+      margin: 0;
+      overflow: hidden;
+      background: transparent;
+      font-family: "Noto Sans SC", "Microsoft YaHei", system-ui, sans-serif;
+    }
+    .caption-overlay-window {
+      min-height: 100vh;
+      display: grid;
+      align-content: center;
+      gap: 10px;
+      padding: 16px 18px;
+      border: 1px solid var(--overlay-border);
+      border-radius: 18px;
+      color: var(--overlay-text);
+      background: linear-gradient(180deg, rgba(15, 23, 42, 0.9), var(--overlay-bg));
+      box-shadow: 0 28px 90px rgba(0, 0, 0, 0.55);
+    }
+    .caption-overlay-meta {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      gap: 12px;
+      color: var(--overlay-muted);
+      font: 700 12px/1.2 ui-monospace, SFMono-Regular, Consolas, monospace;
+    }
+    .caption-overlay-meta strong {
+      color: var(--overlay-green);
+      font-weight: 800;
+    }
+    .caption-overlay-source {
+      margin: 0;
+      color: #cbd5e1;
+      font-size: 18px;
+      line-height: 1.45;
+    }
+    .caption-overlay-target {
+      margin: 0;
+      color: #ffffff;
+      font-size: clamp(28px, 6vw, 48px);
+      font-weight: 850;
+      line-height: 1.22;
+      text-wrap: balance;
+    }
+    .caption-overlay-target.only-source {
+      color: #dbeafe;
+      font-size: clamp(24px, 5vw, 40px);
+    }
+    .caption-overlay-empty {
+      color: var(--overlay-muted);
+      font-size: 20px;
+      font-weight: 750;
+    }
+  `;
+  documentRef.head.appendChild(style);
+  overlayWindow.addEventListener('pagehide', onClose, { once: true });
+  overlayWindow.addEventListener('beforeunload', onClose, { once: true });
+}
+
+function updateCaptionOverlay(overlayWindow, payload) {
+  if (!overlayWindow || overlayWindow.closed) return;
+  const root = overlayWindow.document.getElementById('caption-overlay-root');
+  if (!root) return;
+
+  const sourceHtml = payload.showSource && payload.source
+    ? `<p class="caption-overlay-source">${escapeHtml(payload.source)}</p>`
+    : '';
+  const targetClass = payload.showTarget ? '' : ' only-source';
+  const targetText = payload.showTarget ? payload.target : payload.source;
+  const captionHtml = targetText
+    ? `<p class="caption-overlay-target${targetClass}">${escapeHtml(targetText)}</p>`
+    : `<p class="caption-overlay-empty">${escapeHtml(payload.emptyText)}</p>`;
+  root.innerHTML = `
+    <div class="caption-overlay-meta">
+      <span>${escapeHtml(payload.modeLabel)}</span>
+      <strong>${escapeHtml(payload.statusLabel)}</strong>
+    </div>
+    ${sourceHtml}
+    ${captionHtml}
+  `;
+}
+
+function buildCaptionOverlayPayload({
+  copy,
+  currentInterim,
+  latestSubtitle,
+  subtitleMode,
+  sourceLanguage,
+  targetLanguage,
+  sourceMode,
+  captureSourceLabel,
+  liveStage,
+  liveStats,
+  isCapturing,
+}) {
+  const source = currentInterim.en || latestSubtitle?.en || '';
+  const target = currentInterim.zh || latestSubtitle?.zh || '';
+  const modeLabel = `${formatLanguageCode(sourceLanguage)} -> ${formatLanguageCode(targetLanguage)} · ${copy.subtitles}`;
+  const liveStatus = sourceMode === 'live'
+    ? `${captureSourceLabel || copy.live} · ${isCapturing ? liveStage : 'idle'} · Done ${liveStats.processed}`
+    : `${sourceMode.toUpperCase()} · ${target ? 'captions ready' : 'waiting'}`;
+
+  return {
+    source,
+    target,
+    showSource: shouldShowOriginal(subtitleMode, true),
+    showTarget: shouldShowChinese(subtitleMode),
+    modeLabel,
+    statusLabel: liveStatus,
+    emptyText: copy.readyZh,
+  };
+}
+
+function formatLanguageCode(value) {
+  return value === 'auto' ? 'auto' : value;
+}
+
+function escapeHtml(value) {
+  return String(value ?? '')
+    .replace(/&/g, '&amp;')
+    .replace(/</g, '&lt;')
+    .replace(/>/g, '&gt;')
+    .replace(/"/g, '&quot;')
+    .replace(/'/g, '&#039;');
 }
