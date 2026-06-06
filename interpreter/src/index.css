@@ -326,6 +326,23 @@ button {
   gap: 8px;
 }
 
+.demo-preset-heading {
+  display: grid;
+  gap: 5px;
+  padding: 2px 2px 4px;
+}
+
+.demo-preset-heading strong {
+  color: #e5eefc;
+  font-size: 13px;
+}
+
+.demo-preset-heading span {
+  color: var(--muted);
+  font-size: 12px;
+  line-height: 1.45;
+}
+
 .demo-scenarios > button {
   display: grid;
   grid-template-columns: auto minmax(0, 1fr);

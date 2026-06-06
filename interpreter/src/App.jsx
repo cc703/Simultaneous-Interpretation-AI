@@ -84,6 +84,8 @@ const UI_COPY = {
     export: '导出',
     copy: '复制',
     source: '输入源',
+    demoPreset: '演示场景 / 术语预设',
+    demoPresetHint: '仅用于内置演示：切换样本内容与场景术语。',
     demo: '演示',
     mic: '麦克风',
     file: '文件',
@@ -132,6 +134,8 @@ const UI_COPY = {
     export: 'Export',
     copy: 'Copy',
     source: 'Source',
+    demoPreset: 'Demo scene / glossary preset',
+    demoPresetHint: 'For built-in demo only: switches sample content and scenario terms.',
     demo: 'Demo',
     mic: 'Mic',
     file: 'File',
@@ -695,6 +699,10 @@ export default function App() {
             </div>
             {sourceMode === 'demo' && (
               <div className="demo-scenarios" aria-label="Demo scenario presets">
+                <div className="demo-preset-heading">
+                  <strong>{copy.demoPreset}</strong>
+                  <span>{copy.demoPresetHint}</span>
+                </div>
                 {demoScenarios.map((scenario) => (
                   <button
                     type="button"
@@ -711,8 +719,8 @@ export default function App() {
                 <div className="mode-help-card">
                   <Sparkles size={16} />
                   <div>
-                    <strong>Ready without keys · {activeDemoScenario.transcript.length} captions</strong>
-                    <span>选择一个场景后点击开始，系统会播放内置英文语音流，并按该场景术语生成中文字幕。</span>
+                    <strong>{activeDemoScenario.terms.length} terms · {activeDemoScenario.transcript.length} captions</strong>
+                    <span>{copy.demoPresetHint}</span>
                   </div>
                 </div>
               </div>
