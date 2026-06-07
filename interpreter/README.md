@@ -2,53 +2,84 @@
 
 ![AI 同声传译助手视觉封面](public/og-cover.svg)
 
-本作品选择比赛题目二：**AI 同声传译助手**。
+本项目对应比赛题目二：**AI 同声传译助手**。它面向英语演讲、技术分享、国际会议、网课和网页直播等单向音频流场景，通过 ASR、语义分段、流式翻译、字幕浮窗、语音播报和修正记忆，帮助用户实时跟上外语内容。
 
-目标是在 2026-06-05 00:00 至 2026-06-07 23:59 的开发周期内，完成一个能将外语音频流实时翻译成中文，并支持字幕/语音输出与翻译修正能力的 AI 应用。当前产品默认目标语言为中文，同时支持英文、日文、韩文等目标语言切换，便于展示可扩展的同传路由。
+当前默认目标语言为中文，也支持繁体中文、英文、日文、韩文、法文和西班牙文等目标语言切换。核心目标不是“把音频文件翻译完”，而是按同传流程持续读取当前音频流，以低延迟字幕或语音形式输出，并在后续上下文到来时修正前面的识别或翻译结果。
 
-## 当前阶段
+## 当前能力
 
-PR-14：演示材料与提交文案完善。
+- **Demo 模式**：无 Key 也能稳定演示“英文音频流 -> 中文字幕 -> 人工修正 -> 术语重译 -> TTS -> SRT 导出”的完整闭环。
+- **File 模式**：支持上传音频/视频文件，或一键加载内置样本；真实 ASR 完成后按媒体播放进度逐句释放字幕，避免语音未结束字幕先跑完。
+- **Live 模式**：通过浏览器 `getDisplayMedia` 捕获当前共享标签页或屏幕的音频流，按 2-3 秒自适应语义窗送入 ASR，再持续输出中文字幕。
+- **直播/媒体兼容**：浏览器常见 WebM/Opus 直播片段会在本地 Gateway 转成 16kHz mono WAV 后再送 DashScope ASR。
+- **快语速处理**：检测 WPM、ASR 不稳定和追赶状态；语速过快时显示紧凑状态提示，不把诊断文字当作正式大字幕。
+- **静音/无音频处理**：能区分“没有实际音量”和“有声音但 ASR 未稳定捕获”，不会把快语速误报成静音，也不会伪造字幕。
+- **字幕浮窗**：支持浏览器 Document Picture-in-Picture 或弹出窗口，用户可切回直播/会议页面观看，字幕继续同步。
+- **翻译修正**：人工修正会写入修正记忆；自动回修会基于后续上下文修正近期字幕，同时保护用户人工确认的译文不被覆盖。
+- **输出能力**：支持双语/目标语言/源语言视图、浏览器 TTS 播报、SRT 导出和双语文本复制。
 
-当前已建立 Vite + React 前端工程和 Node 后端代理，完成同传字幕工作台、Web Speech API STT、OpenAI-compatible 流式翻译、DashScope Qwen-ASR 后端代理、翻译修正闭环、稳定 Demo 模式、文件上传真实转写、直播标签页/屏幕音频捕获与 MediaRecorder 分片 ASR、WebM/Opus 直播片段转码、快语速/静音/ASR 不稳定检测、直播字幕浮窗、高级设置、Web Audio 波形、浏览器 TTS、SRT / 双语文本导出。页面按“听音接入、语音切分、语义理解、转译重组、字幕输出、修正沉淀”组织 File 和 Live 工作流，包含输入源选择、语言路由、Provider 配置、File/Live ASR 配置、演示场景/术语预设、时间轴字幕流、按需出现的修正编辑器、底部字幕预览和统计栏。
+## 技术结构
 
-Demo 视频：待录制，提交前替换为公开可访问链接。
-
-录屏讲解脚本见 `docs/demo-script.md`。
-
-最终演示路径见 `docs/final-demo-path.md`。
-
-轻量 AI Gateway 设计见 `docs/backend-gateway.md`。
-
-阿里云百炼 DashScope 配置见 `docs/dashscope-bailian-setup.md`。
-
-视觉系统与页面层级设计见 `docs/visual-system.md`。
-
-## 快速开始
-
-```bash
-cd interpreter
-npm install
-npm run dev
+```text
+interpreter/
+  server/index.js              本地 AI Gateway，隔离 Key、转发翻译/ASR、处理转码和重试
+  src/App.jsx                  主工作台、输入源、字幕、浮窗、修正和设置
+  src/engine/liveAsr.js        Live MediaRecorder 分片、语速检测、静音/ASR 不稳定处理
+  src/engine/fileAsrStream.js  File 播放进度驱动的语义释放
+  src/engine/asrAdapter.js     ASR 文本清洗、语义分段和翻译入口
+  src/engine/translator.js     OpenAI-compatible 流式翻译
+  src/engine/correctionEngine.js 自动上下文回修
+  src/engine/tts.js            浏览器中文语音播报队列
+  src/store/useStore.js        Zustand 状态、字幕、术语、修正记忆
+  scripts/                     API、媒体、浏览器和最终闭环 smoke
+  docs/                        设计、演示路径、DashScope 配置和 smoke 证据
+  test-media/                  自动化测试用音频、视频和直播分片样本
 ```
 
-开发服务器默认运行在 `http://localhost:5173`。
+前端使用 Vite + React + Zustand。后端是轻量 Node Gateway，不做用户系统、数据库或字幕持久化，只负责：
 
-真实 ASR / 翻译推荐同时启动本地后端代理：
+- 从 `.env` 读取 Key，避免浏览器暴露真实 Key。
+- 统一 `/api/translate` 和 `/api/transcribe`。
+- 适配 DashScope / OpenAI-compatible API。
+- 将 WebM/Opus/视频音轨转成 ASR 更稳定的 WAV。
+- 对 ASR 网络错误、429、5xx 做有限重试。
+- 返回明确的边界错误，不生成假字幕。
+
+## 快速启动
+
+推荐使用两个终端。
+
+终端 A：启动本地 Gateway。
 
 ```bash
 cd interpreter
 copy .env.example .env
 # 在 .env 中填写 DASHSCOPE_API_KEY
+npm install
 npm run dev:server
 ```
 
-然后另开一个终端运行 `npm run dev`。Vite 会把 `/api/*` 转发到 `http://localhost:8787`。未启动后端时，Demo 模式仍可完整演示；填写浏览器内存 Key 时也可以继续走浏览器直连。
+终端 B：启动前端。
 
-如果使用阿里云百炼免费额度，默认可以让同一个 `DASHSCOPE_API_KEY` 同时驱动翻译和 ASR。当前默认翻译模型为 `qwen-plus`，默认 ASR 模型为 `qwen3-asr-flash`：
+```bash
+cd interpreter
+npm run dev -- --host 127.0.0.1
+```
+
+默认地址：
+
+- 前端：`http://127.0.0.1:5173`
+- Gateway：`http://127.0.0.1:8787`
+- 健康检查：`http://127.0.0.1:8787/api/health`
+
+如果 `8787` 提示 `EADDRINUSE`，先打开健康检查。如果返回 `ok: true` 且显示 `asrProvider: dashscope`，说明已有健康 Gateway 在运行，不需要再启动第二个。
+
+## 环境变量
+
+最小 DashScope 配置：
 
 ```env
-DASHSCOPE_API_KEY=你的阿里云百炼DashScope Key
+DASHSCOPE_API_KEY=你的阿里云百炼 DashScope Key
 DASHSCOPE_BASE_URL=https://dashscope.aliyuncs.com/compatible-mode/v1
 DASHSCOPE_TRANSLATION_MODEL=qwen-plus
 ASR_PROVIDER=dashscope
@@ -56,19 +87,95 @@ DASHSCOPE_ASR_BASE_URL=https://dashscope.aliyuncs.com/compatible-mode/v1
 DASHSCOPE_ASR_MODEL=qwen3-asr-flash
 ```
 
-如需换成 OpenAI 或其他 OpenAI-compatible 网关，可再填写 `OPENAI_TRANSLATION_BASE_URL`、`OPENAI_TRANSLATION_API_KEY`、`OPENAI_TRANSLATION_MODEL` 等覆盖项。很多第三方聊天网关只支持 `/chat/completions`，不支持语音转写。可用以下命令检查当前 `.env` 的接口可达性：
+可选配置：
 
-前端默认翻译 Provider 为 `Server Gateway`，因此不需要在浏览器里填写 Key；启动本地后端后会自动通过 `/api/translate` 使用 `.env` 中的百炼 Key。
-
-```bash
-npm run check:api
+```env
+PORT=8787
+ASR_RETRY_ATTEMPTS=3
+ASR_RETRY_DELAY_MS=750
+OPENAI_TRANSLATION_BASE_URL=https://dashscope.aliyuncs.com/compatible-mode/v1
+OPENAI_TRANSLATION_API_KEY=同 DASHSCOPE_API_KEY 或其他 OpenAI-compatible Key
+OPENAI_TRANSLATION_MODEL=qwen-plus
+OPENAI_ASR_BASE_URL=https://api.openai.com/v1
+OPENAI_ASR_API_KEY=你的 OpenAI ASR Key
+OPENAI_ASR_MODEL=gpt-4o-mini-transcribe
 ```
 
-本地后端定位为轻量 AI Gateway，只负责 Key 隔离、Provider 适配和统一错误边界，不做用户系统、数据库或字幕业务存储。
+说明：
 
-验证命令：
+- 默认前端翻译 Provider 为 `Server Gateway`，启动后端后不需要在浏览器输入 Key。
+- 浏览器设置面板中的 API Key 只保存在当前页面内存，不写入 localStorage。
+- Provider、Base URL、目标语言、风格、上下文窗口、分片长度、TTS 语速等用户设置会保存到 localStorage。
+- 许多第三方聊天网关只支持 `/chat/completions`，不支持语音转写。用 `npm run check:api` 检查当前 `.env` 是否可用。
+
+## 使用流程
+
+### Demo 模式
+
+1. 选择输入源 `演示`。
+2. 可切换发布会、技术分享、商务会议三个场景。
+3. 点击 `开始同传`。
+4. 英文音频模拟播放，中文字幕按时间逐句出现。
+5. 任意字幕都可以继续执行人工修正、术语重译、TTS 和导出。
+
+### File 模式
+
+1. 选择输入源 `文件`。
+2. 点击 `加载样本`，或上传 `.mp3`、`.mp4`、`.wav`、`.m4a`、`.webm`、`.ogg` 等音视频文件。
+3. 点击 `开始同传`。
+4. 系统会先做真实 ASR；完成后按媒体播放进度逐句释放字幕，媒体还没结束时不会提前把同传流程判定为完成。
+5. 如果未配置 ASR Key，内置样本会明确标注使用绑定转写文本继续跑演示闭环；普通文件会提示配置缺口，不伪装真实 ASR。
+
+当前前端建议单次上传 25MB 内。DashScope inline 音频建议 10MB 内；更大文件需要继续扩展对象存储 URL 或后端分片上传。
+
+### Live 模式
+
+1. 选择输入源 `直播`。
+2. 点击 `选择直播音频`。
+3. 在浏览器弹窗中选择正在播放英文视频/直播/会议的标签页或屏幕，并勾选共享标签页音频。
+4. 点击 `开始同传` 或捕获后自动进入 Live ASR。
+5. 打开顶部 `浮窗`，切回直播页面观看；字幕会继续同步。
+
+Live 左侧会显示：
+
+- 捕获来源和权限状态。
+- ASR Provider 是否可用。
+- 语义窗长度。
+- 语速 WPM 和快语速/过载状态。
+- 输出状态：字幕就绪、无实际音量、ASR 不稳定等。
+- 队列、完成、跳过、重复、Backlog、最近延迟。
+
+注意：如果只共享画面，没有共享标签页音频，系统会提示没有实际音量，不会伪装翻译。若音频存在但语速过快、背景声重或 ASR 采样异常，系统会显示 ASR 不稳定/语速过快，并继续合并下一语义窗追赶当前讲话。
+
+### Mic 模式
+
+1. 选择输入源 `麦克风`。
+2. 点击 `开始同传` 并授权麦克风。
+3. 浏览器 Web Speech API 产生英文 final 结果后进入翻译管线。
+
+Mic 依赖浏览器内置语音识别能力。Chrome/Edge 支持较好；如果浏览器不支持，会明确提示并可切回 Demo。
+
+## 修正、术语、TTS 和导出
+
+- 点击任意字幕卡片，可在修正区编辑译文。
+- 点击 `保存修正` 后，字幕标记为用户修正，并进入人工确认记忆。
+- 在设置面板 `Terms` 中添加术语后，可对字幕执行 `术语重译`。
+- 自动回修只修改非人工确认字幕，不覆盖用户保存过的译文。
+- 打开 `Chinese voice output` 后，稳定中文字幕会进入浏览器 TTS 队列。
+- 点击 `Export` 下载 SRT；点击 `Copy` 复制双语文本，剪贴板不可用时降级下载文本。
+
+## 字幕显示
+
+- 顶部 `双语 / 目标语言 / 检测语言` 可切换显示模式。
+- 底部字幕预览只显示正式字幕，不再显示快语速/ASR 不稳定等诊断文本。
+- 快语速、无声、ASR 不稳定会显示为紧凑状态卡，不占用主字幕大字区域。
+- 主字幕区已移除大块 waveform/progress 装饰面板，避免遮挡当前字幕位置。
+- 浮窗使用当前字幕模式同步显示；不支持 Document Picture-in-Picture 时降级为普通弹窗。
+
+## 验证命令
 
 ```bash
+npm run build
 npm test
 npm run check:api
 npm run smoke:file-asr
@@ -76,140 +183,70 @@ npm run smoke:media
 npm run smoke:gateway-boundaries
 npm run smoke:browser-ux
 npm run smoke:final
-npm run build
+npm run scan:secrets
 ```
 
-`npm test` 使用 Node 原生测试覆盖质量诊断、自动回修、快语速/静音检测、修正记忆、SRT 和导出报告生成函数。`npm run smoke:file-asr` 会使用 `test-media/sample-english-speech.wav` 上传到本地后端；未配置 `DASHSCOPE_API_KEY` 或其他 ASR Key 时应明确通过 `missing_server_key` 边界测试，配置 Key 后会要求返回真实英文转写。`npm run smoke:media` 覆盖音频、视频、音乐无语音、WAV Live 分片和浏览器常见 WebM/Opus Live 分片。`npm run smoke:browser-ux` 会在浏览器中验证 Demo、文件、视频、注入 MediaStream 直播样本、字幕浮窗、快语速、静音、TTS 调用、人工修正和 SRT 导出。`npm run smoke:final` 会聚合构建、单测、API、File、媒体、Gateway、浏览器体验和密钥扫描。样本来源和下载方式见 `docs/file-asr-smoke.md`。
+命令说明：
 
-## STT 验证
+- `npm run build`：Vite 生产构建。
+- `npm test`：Node 原生测试，覆盖语义分段、ASR 错误、快语速/静音、自动回修、TTS、导出、质量诊断。
+- `npm run check:api`：检查 `.env` 中翻译/ASR API 的基本可达性。
+- `npm run smoke:file-asr`：上传英文样本到 `/api/transcribe`，要求返回真实英文转写。
+- `npm run smoke:media`：覆盖英文音频、音乐无语音、视频音轨、WAV Live 分片和 WebM/Opus Live 分片。
+- `npm run smoke:gateway-boundaries`：验证坏 JSON、缺文件、超大小、缺 Key 等边界。
+- `npm run smoke:browser-ux`：用浏览器自动验证 Demo、文件、视频、Live 注入流、浮窗、快语速、静音、TTS、人工修正、SRT 导出，并断言主字幕区不存在 waveform/progress 大块。
+- `npm run smoke:final`：聚合构建、单测、API、File、媒体、Gateway、浏览器体验和密钥扫描。
+- `npm run scan:secrets`：检查仓库中是否误提交真实 Key。
 
-Chrome 或 Edge 中打开本地页面，点击输入源 `麦克风`，再点击 `开始同传` 后授权麦克风。说英文时，当前识别中的英文会显示在字幕区；完整句 final 后会进入翻译管线。未填写 API Key 时会显示明确的占位提示，不会伪装成真实翻译成功。
+最近一次已验证结果：
 
-## 翻译验证
-
-当前翻译引擎支持 OpenAI-compatible SSE 流式响应。`设置 -> 翻译` 可选择 DeepSeek、Server Gateway 或 Custom，并填写 API Key；API Key 只保存在当前页面内存状态中，不写入 localStorage。若启动了本地后端并在 `.env` 配置 `DASHSCOPE_API_KEY`，选择 `Server Gateway` 且浏览器 Key 为空时，前端会优先通过 `/api/translate` 使用服务端代理。
-
-## 修正闭环验证
-
-页面加载后会初始化术语表；字幕需要通过 Demo、Mic、File 或 Live 工作流产生：
-
-1. 点击任意字幕卡片。
-2. 在翻译修正区编辑目标语言译文。
-3. 点击 `保存修正`，字幕会标记为用户修正，修正计数增加。
-4. 在 `设置 -> 术语` 输入 source 和目标语言译法，点击新增术语。
-5. 点击 `术语重译`，命中术语的字幕会标记为术语命中。
-6. 人工保存过的修正会进入修正记忆，后续真实翻译 prompt 会参考这些用户确认译文。
-7. 术语重译会把命中术语写回当前字幕，作为专业翻译一致性证据。
-
-## Demo 模式验证
-
-不填写 API Key 也可以验证完整产品闭环：
-
-1. 保持输入源为 `Demo`。
-2. 点击 `开始同传`。
-3. 字幕会按时间逐条出现，而不是一次性显示全部内容。
-4. 示例脚本包含 `latency budget`、`pitch deck`、`edge device` 三个术语。
-5. Demo 字幕仍可继续执行人工修正、添加术语和术语重译。
-
-## 文件模式验证
-
-1. 点击输入源 `文件`，可点击 `加载样本` 一键加载内置英文样本，也可上传 `.mp3`、`.mp4`、`.wav`、`.m4a`、`.webm` 或 `.ogg` 文件。
-2. 推荐启动已配置 `DASHSCOPE_API_KEY` 的本地后端代理；默认国产 ASR 模型为 `qwen3-asr-flash`。如需 OpenAI ASR，可把 `.env` 中 `ASR_PROVIDER` 改为 `openai`。
-3. 内置样本来自 `test-media/sample-english-speech.wav`，并复制到 `public/demo-media/` 供页面一键加载；左侧会显示文件名、大小、格式和时长。
-4. 点击 `开始同传` 后，系统会把文件发送到本地 `/api/transcribe`，再由 Gateway 转给 DashScope Qwen-ASR 或可选 OpenAI-compatible ASR。
-5. 转写结果不会一次性铺满页面，而是按音频播放进度进入“语义理解 -> 转译重组 -> 字幕输出”流程，逐句出现。
-6. 如果未填写浏览器 ASR Key 且后端没有配置 Key，内置样本会明确提示并使用绑定英文转写文本继续跑完 File 主线；普通文件会降级为演示转写流，不会伪装成真实 ASR。
-7. 如果翻译 Key 不可用，系统会使用标注的本地演示译文，确保字幕修正、术语命中、TTS 和导出仍可演示。
-8. 当前前端仍限制单次上传 25MB；更大文件可继续扩展后端分片上传。
-
-## 直播模式验证
-
-1. 点击输入源 `直播`。
-2. Live 面向网页直播、社交平台直播、媒体直播和线上会议；产品路径为 `选择直播源 -> 捕获浏览器音频 -> 2-3 秒自适应语义窗 ASR -> 目标语言字幕 -> 修正导出`。
-3. 推荐启动已配置 `DASHSCOPE_API_KEY` 的本地后端代理；Live 会复用同一套 `/api/transcribe` 配置。若使用 OpenAI ASR，可把 `.env` 中 `ASR_PROVIDER` 改为 `openai`。
-4. 点击 `选择直播音频`，选择一个带英文音频的浏览器标签页或屏幕，并确认共享音频。
-5. 左侧会显示捕获来源、权限状态、ASR 配置状态、分片长度、语速 WPM、字幕输出状态和 Live 统计；`Latency` 是最近片段的 ASR/翻译处理耗时，按毫秒展示。
-6. 点击顶部 `浮窗` 可打开字幕浮窗；Chromium 支持时会使用 Document Picture-in-Picture，用户可以切回直播/会议页面并把字幕浮窗放在画面上方。
-7. 如果浏览器支持 MediaRecorder，系统会按自适应语义窗持续转写直播音频，并把转写文本送入翻译链路；浏览器输出的 WebM/Opus 片段会在 Gateway 转成 16kHz mono WAV 后送入 DashScope ASR。
-8. 未填写浏览器 ASR Key 且后端没有配置 Key 时，Live 只展示捕获、波形和配置缺口，不会伪装为真实转写。
-9. 如果共享的标签页没有勾选音频或音量长期为 0，系统会显示无音频提示；如果有声音但语速过快或 ASR 不稳定，会显示快语速/ASR 不稳定反馈，不会错误标成静音。
-
-## 设置面板验证
-
-- 顶部点击 `Settings` 可打开高级设置面板。
-- 支持配置源语言、目标语言、翻译风格、上下文窗口、音频分片长度和专业词汇增强。
-- Provider、Custom Base URL 和翻译参数会保存到 localStorage。
-- API Key 只保存在当前内存状态中，不写入 localStorage。
-
-## 字幕显示验证
-
-- 右上 `双语` / `目标语言` / `检测语言` 会实时切换字幕展示方式。
-- `Settings` 可控制是否显示源语言原文、底部字幕预览、修正记忆和语音输出。
-- 关闭自动修正记忆后，后续真实翻译不会注入人工修正记忆。
-- 顶部 `浮窗` 会打开独立字幕窗口，跟随当前字幕模式同步显示；不支持 Document Picture-in-Picture 的浏览器会降级为普通弹出窗口。
-
-## 波形验证
-
-- 文件模式开始播放后，波形条会读取 `<audio>` 的 Web Audio 频谱数据。
-- 直播模式捕获音频后，波形条会读取 `MediaStream` 的频谱数据。
-- 没有真实音频输入时不显示假波形，避免误导；开始捕获或播放后再展示波形。
-
-## TTS 验证
-
-- 打开 `Settings` 中的语音输出。
-- Demo 或文件模式产生稳定字幕后，浏览器会按目标语言播报。
-- `Settings` 中可调整语速，浏览器原生音色取决于当前系统/浏览器可用语音。
-- 停止翻译会立即取消播报队列，避免停止后继续朗读。
-
-## 导出验证
-
-- 点击顶部 `Export` 会下载 SRT 字幕文件。
-- 点击顶部 `Copy` 会复制当前双语文本；如果浏览器剪贴板不可用，则降级下载文本文件。
-- 导出内容使用当前字幕状态，因此会包含人工修正后的最终译文。
-
-## 计划功能
-
-- 麦克风英文语音实时识别与中文字幕输出：已完成浏览器 Web Speech API MVP。
-- 文件音频真实 ASR：已完成 DashScope Qwen-ASR 国产后端代理入口，并保留 OpenAI `/audio/transcriptions` 可选入口；未配置 Key 时降级为稳定演示流。
-- Demo 音频流：已完成英文语音模拟 + 中文流式字幕，用于无 Key 稳定演示。
-- Live 直播音频流：已完成浏览器标签页/屏幕音频捕获、MediaRecorder 语义窗分片、WebM/Opus 转 WAV、快语速检测、静音检测、停止时收尾 flush 和字幕浮窗同步。
-- AI 流式翻译：已完成 OpenAI-compatible SSE 引擎、Provider 配置与 `/api/translate` 服务端代理。
-- 人工修正字幕译文：已完成。
-- 术语表与术语命中：已完成。
-- 质量诊断与修正记忆：已完成，支持风险标签和用户修正记忆 prompt。
-- 上下文自动回修：已完成近期字幕基于后续语境的自动回修，并保护用户人工确认的译文不被覆盖。
-- SRT / 双语文本导出：已完成。
-- 导出报告生成函数：已完成，包含风险诊断、术语表、修正记录和完整双语转写；当前页面主入口保留 SRT 导出和双语文本复制。
-- 可选 TTS 播报：已完成浏览器原生语音输出，播报语言跟随目标语言。
+- `npm.cmd run build` 通过。
+- `npm.cmd test` 通过：9 suites / 29 tests / 0 fail。
+- `APP_URL=http://127.0.0.1:5173 npm.cmd run smoke:browser-ux` 通过。
+- `npm.cmd run smoke:media` 通过。
+- `npm.cmd run smoke:file-asr` 通过。
+- 详细 smoke 记录见 `docs/final-closure-smoke.md`、`docs/media-scenario-smoke.md`、`docs/gateway-boundary-smoke.md`。
 
 ## 能力边界
 
-当前作品聚焦比赛题目二要求的“外语音频流实时翻译成中文、字幕/语音输出、翻译修正能力”。为了保证 72 小时内可稳定演示，系统提供三层能力：
+- Live 同传依赖浏览器 `getDisplayMedia` 权限、用户是否勾选共享标签页音频、ASR Key、网络质量和上游供应商稳定性。
+- 默认 2-3 秒自适应语义窗追求低延迟，但端到端延迟仍受音频分片、ASR、翻译和网络影响，不承诺零延迟。
+- 自动化测试可证明注入 MediaStream、WebM/Opus 分片、文件/视频和浮窗同步链路；真实抖音、会议或直播标签页仍需要用户手动选择共享音频。
+- 字幕浮窗是浏览器窗口能力，不直接注入、修改或控制第三方直播/会议网站页面。
+- TTS 使用浏览器原生 `speechSynthesis`，实际音色和可用语言取决于系统/浏览器。
+- Gateway 不存储历史字幕和用户数据；刷新页面后仅保留 localStorage 中的非 Key 设置。
 
-- 稳定评审闭环：Demo 模式可以在无 Key 情况下稳定展示“外语音频流输入 -> 目标语言字幕输出 -> 人工修正 -> 术语重译 -> TTS 播报 -> 导出”。
-- 真实浏览器能力：Mic 使用 Web Speech API 做英文语音识别；File 模式可通过本地 Gateway 调用 DashScope 或可选 OpenAI ASR 做真实文件转写；Live 模式可通过 MediaRecorder 持续读取当前共享标签页或屏幕音频并分片调用 ASR；Provider 配置后可走真实 OpenAI-compatible 流式翻译。
-- 翻译修正能力：自动回修会基于后续语境修正近期字幕，人工修正会写入修正记忆并作为后续翻译提示的一部分；质量诊断可提示漏译、术语未命中和占位翻译。
-- 能力限制：Live ASR 依赖浏览器 MediaRecorder、用户共享音频权限、ASR Key 和网络质量；默认 2-3 秒自适应语义窗，处理耗时按毫秒统计，但端到端延迟仍取决于音频分片、ASR、翻译和网络，不承诺零延迟。自动化测试可证明注入 MediaStream 和 WebM/Opus 片段链路；真实 DY/会议/直播标签页仍需要用户在浏览器权限弹窗中手动选择并勾选共享音频。
-- 浮窗边界：字幕浮窗是浏览器 Picture-in-Picture 或弹出窗口能力，不直接注入或修改第三方直播、会议、媒体网站的页面结构。
+## 演示建议
 
-## 已完成 PR 记录
+1. 先用 Demo 展示稳定闭环。
+2. 再用 File 内置样本展示真实 ASR、媒体同步和逐句字幕。
+3. 打开 Live，选择正在播放英文视频的标签页并勾选共享音频。
+4. 打开浮窗，切回视频页面，观察字幕同步。
+5. 手动修正一条字幕，保存后导出 SRT。
+6. 说明边界：没有共享音频不会生成假字幕；快语速会显示状态诊断并继续追赶。
 
-1. PR-02：全局状态管理
-2. PR-03：UI 框架与静态布局
-3. PR-04：STT 引擎
-4. PR-05：AI 流式翻译引擎
-5. PR-06：翻译修正闭环
-6. PR-07：Demo 时间轴字幕流
-7. PR-08：SRT / 双语文本导出
-8. PR-09：文件上传播放驱动字幕流
-9. PR-10：直播系统音频捕获入口
-10. PR-11：Provider 与翻译设置面板
-11. PR-12：Web Audio 波形可视化
-12. PR-13：浏览器中文 TTS 播报
-13. PR-14：演示材料、README 和提交文案完善
+录屏讲解脚本见 `docs/demo-script.md`。最终演示路径见 `docs/final-demo-path.md`。DashScope 配置见 `docs/dashscope-bailian-setup.md`。
+
+## 已完成记录
+
+- PR-02：全局状态管理。
+- PR-03：UI 框架与静态布局。
+- PR-04：STT 引擎。
+- PR-05：AI 流式翻译引擎。
+- PR-06：翻译修正闭环。
+- PR-07：Demo 时间轴字幕流。
+- PR-08：SRT / 双语文本导出。
+- PR-09：文件上传播放驱动字幕流。
+- PR-10：直播系统音频捕获入口。
+- PR-11：Provider 与翻译设置面板。
+- PR-12：TTS 和输出能力。
+- PR-13：DashScope Gateway、真实 File ASR 和媒体 smoke。
+- PR-14：Live 语义窗、浮窗、快语速/静音/ASR 不稳定检测。
+- PR-15：诊断提示紧凑化，避免把状态文本当成正式字幕。
+- PR-16：移除主字幕区 waveform/progress 大块并补充最终 README。
 
 ## 后续扩展
 
-- 增加云端长直播录制/断点续传和更长会话的字幕检索。
-- 增加更完整的真人录屏评测，例如不同平台共享音频、实际外放 TTS 和人工口译质量评分。
-- 提交前录制 Demo 视频，并将公开链接替换到 README 顶部。
+- 增加长直播的云端录制、断点续传和历史字幕检索。
+- 增加真人口译质量评分和更多真实平台直播的人工验收样例。
+- 增加对象存储 URL ASR，支持更大音视频文件。
