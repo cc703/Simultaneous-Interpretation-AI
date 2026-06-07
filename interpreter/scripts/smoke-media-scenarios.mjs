@@ -24,6 +24,11 @@ const cases = [
     file: 'test-media/sample-live-chunk.wav',
     expectation: 'speech',
   },
+  {
+    name: 'live-chunk-webm',
+    file: 'test-media/sample-live-chunk.webm',
+    expectation: 'speech',
+  },
 ];
 
 const results = [];

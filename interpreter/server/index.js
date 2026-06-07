@@ -19,6 +19,8 @@ const OPENAI_TRANSLATION_MODEL = readEnv('OPENAI_TRANSLATION_MODEL', readEnv('DA
 const DASHSCOPE_ASR_BASE_URL = readEnv('DASHSCOPE_ASR_BASE_URL', 'https://dashscope.aliyuncs.com/compatible-mode/v1');
 const DASHSCOPE_ASR_MODEL = readEnv('DASHSCOPE_ASR_MODEL', 'qwen3-asr-flash');
 const DASHSCOPE_MAX_AUDIO_BYTES = 10 * 1024 * 1024;
+const ASR_RETRY_ATTEMPTS = Math.max(1, Number(readEnv('ASR_RETRY_ATTEMPTS', '3')));
+const ASR_RETRY_DELAY_MS = Math.max(0, Number(readEnv('ASR_RETRY_DELAY_MS', '750')));
 
 const server = http.createServer(async (request, response) => {
   try {
@@ -180,15 +182,19 @@ async function proxyTranscription(request, response) {
 }
 
 async function proxyOpenAITranscription({ body, contentType, response }) {
-  let upstream;
+  let upstreamResult;
   try {
-    upstream = await fetch(`${OPENAI_ASR_BASE_URL.replace(/\/$/, '')}/audio/transcriptions`, {
-      method: 'POST',
-      headers: {
-        Authorization: `Bearer ${OPENAI_ASR_API_KEY}`,
-        'Content-Type': contentType,
+    upstreamResult = await fetchTextWithRetry({
+      label: 'OpenAI ASR',
+      url: `${OPENAI_ASR_BASE_URL.replace(/\/$/, '')}/audio/transcriptions`,
+      options: {
+        method: 'POST',
+        headers: {
+          Authorization: `Bearer ${OPENAI_ASR_API_KEY}`,
+          'Content-Type': contentType,
+        },
+        body,
       },
-      body,
     });
   } catch (error) {
     sendError(response, 502, {
@@ -201,7 +207,7 @@ async function proxyOpenAITranscription({ body, contentType, response }) {
     return;
   }
 
-  const text = await upstream.text();
+  const { response: upstream, text, attempts } = upstreamResult;
   if (!upstream.ok) {
     sendError(response, upstream.status, {
       error: `ASR failed: ${text}`,
@@ -210,6 +216,7 @@ async function proxyOpenAITranscription({ body, contentType, response }) {
       provider: 'openai',
       upstreamStatus: upstream.status,
       upstreamBaseUrl: redactBaseUrl(OPENAI_ASR_BASE_URL),
+      retryAttempts: attempts,
     });
     return;
   }
@@ -259,29 +266,33 @@ async function proxyDashScopeTranscription({ body, contentType, response }) {
 
   const dataUrl = `data:${media.contentType};base64,${media.file.toString('base64')}`;
   const audioFormat = inferAudioFormat(media.contentType);
-  let upstream;
+  let upstreamResult;
   try {
-    upstream = await fetch(`${DASHSCOPE_ASR_BASE_URL.replace(/\/$/, '')}/chat/completions`, {
-      method: 'POST',
-      headers: {
-        Authorization: `Bearer ${DASHSCOPE_API_KEY}`,
-        'Content-Type': 'application/json',
-      },
-      body: JSON.stringify({
-        model: DASHSCOPE_ASR_MODEL,
-        stream: false,
-        messages: [
-          {
-            role: 'user',
-            content: [
-              { type: 'input_audio', input_audio: { data: dataUrl, format: audioFormat } },
-            ],
-          },
-        ],
-        asr_options: {
-          enable_itn: false,
+    upstreamResult = await fetchTextWithRetry({
+      label: 'DashScope ASR',
+      url: `${DASHSCOPE_ASR_BASE_URL.replace(/\/$/, '')}/chat/completions`,
+      options: {
+        method: 'POST',
+        headers: {
+          Authorization: `Bearer ${DASHSCOPE_API_KEY}`,
+          'Content-Type': 'application/json',
         },
-      }),
+        body: JSON.stringify({
+          model: DASHSCOPE_ASR_MODEL,
+          stream: false,
+          messages: [
+            {
+              role: 'user',
+              content: [
+                { type: 'input_audio', input_audio: { data: dataUrl, format: audioFormat } },
+              ],
+            },
+          ],
+          asr_options: {
+            enable_itn: false,
+          },
+        }),
+      },
     });
   } catch (error) {
     sendError(response, 502, {
@@ -294,7 +305,7 @@ async function proxyDashScopeTranscription({ body, contentType, response }) {
     return;
   }
 
-  const bodyText = await upstream.text();
+  const { response: upstream, text: bodyText, attempts } = upstreamResult;
   if (!upstream.ok) {
     sendError(response, upstream.status, {
       error: `DashScope ASR failed: ${bodyText}`,
@@ -303,6 +314,7 @@ async function proxyDashScopeTranscription({ body, contentType, response }) {
       provider: 'dashscope',
       upstreamStatus: upstream.status,
       upstreamBaseUrl: redactBaseUrl(DASHSCOPE_ASR_BASE_URL),
+      retryAttempts: attempts,
     });
     return;
   }
@@ -333,20 +345,58 @@ async function proxyDashScopeTranscription({ body, contentType, response }) {
   sendJson(response, 200, { text, speechDetected: true });
 }
 
+async function fetchTextWithRetry({ label, url, options }) {
+  let lastError;
+  for (let attempt = 1; attempt <= ASR_RETRY_ATTEMPTS; attempt += 1) {
+    try {
+      const response = await fetch(url, options);
+      const text = await response.text();
+      if (!isRetryableAsrStatus(response.status) || attempt === ASR_RETRY_ATTEMPTS) {
+        return { response, text, attempts: attempt };
+      }
+      console.warn(`[server] ${label} retry ${attempt}/${ASR_RETRY_ATTEMPTS}: status ${response.status}`);
+    } catch (error) {
+      lastError = error;
+      if (attempt === ASR_RETRY_ATTEMPTS) break;
+      console.warn(`[server] ${label} retry ${attempt}/${ASR_RETRY_ATTEMPTS}: ${error.message}`);
+    }
+    await delay(ASR_RETRY_DELAY_MS * attempt);
+  }
+  throw lastError ?? new Error(`${label} upstream retry failed.`);
+}
+
+function isRetryableAsrStatus(status) {
+  return status === 408 || status === 409 || status === 425 || status === 429 || status >= 500;
+}
+
+function delay(ms) {
+  return new Promise((resolve) => setTimeout(resolve, ms));
+}
+
 async function normalizeDashScopeMedia(parsed) {
-  if (!isVideoContent(parsed.contentType)) return parsed;
-  const extracted = await extractAudioToWav(parsed.file);
+  if (!shouldTranscodeForDashScope(parsed.contentType)) return parsed;
+  const extracted = await transcodeAudioToWav(parsed.file);
   return {
     file: extracted,
     contentType: 'audio/wav',
   };
 }
 
-function isVideoContent(contentType) {
-  return contentType.toLowerCase().startsWith('video/');
+function shouldTranscodeForDashScope(contentType) {
+  const normalized = String(contentType ?? '').toLowerCase();
+  if (!normalized) return true;
+  if (normalized.includes('wav') || normalized.includes('wave')) return false;
+  return (
+    normalized.startsWith('video/')
+    || normalized.includes('webm')
+    || normalized.includes('ogg')
+    || normalized.includes('opus')
+    || normalized.includes('mp4')
+    || normalized.includes('m4a')
+  );
 }
 
-async function extractAudioToWav(file) {
+async function transcodeAudioToWav(file) {
   const dir = await mkdtemp(join(tmpdir(), 'interpreter-asr-'));
   const input = join(dir, 'input.media');
   const output = join(dir, 'audio.wav');

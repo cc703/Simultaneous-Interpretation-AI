@@ -631,6 +631,15 @@ button {
   background: rgba(245, 158, 11, 0.08);
 }
 
+.live-state-item.danger {
+  border-color: rgba(239, 68, 68, 0.38);
+  background: rgba(239, 68, 68, 0.1);
+}
+
+.live-state-item.danger strong {
+  color: #fecaca;
+}
+
 .live-boundary {
   padding: 8px 10px;
   border: 1px dashed rgba(245, 158, 11, 0.35);
@@ -649,7 +658,7 @@ button {
 
 .live-stats {
   display: grid;
-  grid-template-columns: repeat(5, minmax(0, 1fr));
+  grid-template-columns: repeat(7, minmax(0, 1fr));
   gap: 5px;
 }
 
@@ -852,7 +861,7 @@ button {
 
 .quality-strip {
   display: grid;
-  grid-template-columns: repeat(4, minmax(0, 1fr));
+  grid-template-columns: repeat(6, minmax(0, 1fr));
   gap: 1px;
   border-bottom: 1px solid var(--border);
   background: var(--border);
@@ -1003,6 +1012,7 @@ button {
 
 .subtitle-scroll {
   min-height: 0;
+  max-height: min(58vh, 640px);
   overflow: auto;
   display: grid;
   align-content: start;
@@ -1011,6 +1021,7 @@ button {
 }
 
 .subtitle-card {
+  position: relative;
   padding: 14px;
   border: 1px solid var(--border);
   border-left: 4px solid var(--dim);
@@ -1064,6 +1075,12 @@ button {
   box-shadow: 0 0 0 2px rgba(59, 130, 246, 0.14), var(--shadow);
 }
 
+.subtitle-card.current {
+  border-color: rgba(16, 185, 129, 0.72);
+  border-left-color: var(--green);
+  box-shadow: 0 0 0 2px rgba(16, 185, 129, 0.18), var(--shadow);
+}
+
 .subtitle-meta {
   display: flex;
   align-items: center;
@@ -1088,6 +1105,12 @@ button {
   background: rgba(245, 158, 11, 0.1);
 }
 
+.current-badge {
+  color: var(--green);
+  border-color: rgba(16, 185, 129, 0.35);
+  background: rgba(16, 185, 129, 0.12);
+}
+
 .subtitle-badges .risk {
   color: var(--red);
   background: rgba(239, 68, 68, 0.1);
@@ -1099,17 +1122,43 @@ button {
 }
 
 .source-text {
+  min-width: 0;
   margin: 12px 0 6px;
   color: var(--muted);
   font-size: 15px;
 }
 
 .translated-text {
+  min-width: 0;
   margin: 0;
   color: var(--text);
   font-size: 22px;
   font-weight: 700;
   line-height: 1.42;
+}
+
+.subtitle-card.collapsed .source-text,
+.subtitle-card.collapsed .translated-text {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  padding-right: 28px;
+}
+
+.subtitle-expand {
+  position: absolute;
+  right: 14px;
+  bottom: 14px;
+  width: 24px;
+  height: 24px;
+  border: 1px solid rgba(148, 163, 184, 0.24);
+  border-radius: 999px;
+  color: var(--muted);
+  background: rgba(2, 6, 23, 0.68);
+}
+
+.subtitle-card.expanded .subtitle-expand svg {
+  transform: rotate(180deg);
 }
 
 .term-hits {
@@ -1154,6 +1203,23 @@ textarea.editor-preview {
   min-height: 72px;
   resize: vertical;
   font: 600 14px/1.45 "Noto Sans SC", sans-serif;
+}
+
+.file-uploader video,
+.file-uploader audio {
+  width: 100%;
+  max-height: 220px;
+  border: 1px solid rgba(148, 163, 184, 0.18);
+  border-radius: 8px;
+  background: #020617;
+}
+
+.correction-saved {
+  align-self: center;
+  color: var(--green);
+  font-size: 12px;
+  font-weight: 800;
+  white-space: nowrap;
 }
 
 .correction-editor button {
@@ -1806,9 +1872,11 @@ body {
 .subtitle-scroll {
   padding: 26px;
   gap: 14px;
+  max-height: min(58vh, 640px);
 }
 
 .subtitle-card {
+  position: relative;
   max-width: 980px;
   padding: 18px 20px;
   border-radius: 14px;

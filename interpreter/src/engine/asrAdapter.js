@@ -6,9 +6,19 @@ import {
   streamTranslate,
   translateBatch,
 } from './translator.js';
+import { reviseRecentSubtitle } from './correctionEngine.js';
+import { repairAsrTextArtifacts } from './streamSegmenter.js';
 import { enqueueTTS } from './tts.js';
 
 const MAX_BROWSER_UPLOAD_BYTES = 25 * 1024 * 1024;
+
+export class NoSpeechDetectedError extends Error {
+  constructor(message = 'ASR 未检测到清晰语音。') {
+    super(message);
+    this.name = 'NoSpeechDetectedError';
+    this.code = 'no_speech_detected';
+  }
+}
 
 export async function transcribeAudioFile({
   file,
@@ -63,15 +73,17 @@ export async function transcribeAudioBlob({
 
   const json = await response.json();
   if (json.speechDetected === false) {
-    throw new Error(json.note || 'ASR 未检测到清晰英文语音。');
+    throw new NoSpeechDetectedError(json.note || 'ASR 未检测到清晰英文语音。');
   }
-  const text = json.text?.trim();
+  const text = repairAsrTextArtifacts(json.text);
   if (!text) throw new Error('ASR 未返回可用英文文本。');
   return text;
 }
 
-export async function translateTranscriptText(text) {
-  await translateTranscriptSentences(splitTranscript(text));
+export async function translateTranscriptText(text, options = {}) {
+  const normalized = repairAsrTextArtifacts(text);
+  const sentences = options.preserveSingleUnit ? [normalized].filter(Boolean) : splitTranscript(normalized);
+  await translateTranscriptSentences(sentences, options);
 }
 
 export async function translateTranscriptTimed(text, {
@@ -79,13 +91,9 @@ export async function translateTranscriptTimed(text, {
   totalDurationSec = 0,
   minGapMs = 450,
 } = {}) {
-  const sentences = splitTranscript(text);
+  const sentences = splitTranscript(repairAsrTextArtifacts(text));
   if (!sentences.length) return;
   const timedSentences = buildTimedSentences(sentences, totalDurationSec);
-  const batchTranslations = await translateSentencesBatch(sentences).catch((error) => {
-    console.warn('[file-asr] batch translation unavailable:', error);
-    return null;
-  });
 
   for (let index = 0; index < timedSentences.length; index += 1) {
     const item = timedSentences[index];
@@ -94,24 +102,17 @@ export async function translateTranscriptTimed(text, {
     } else {
       await delay(minGapMs);
     }
-    if (batchTranslations?.[index]) {
-      appendTranslatedSentence(item.text, batchTranslations[index], {
-        startedAt: performance.now(),
-        timestamp: Date.now(),
-        timeLabel: formatTimeLabel(item.releaseAtSec),
-      });
-    } else {
-      await translateSingleSentence(item.text, {
-        timestamp: Date.now(),
-        timeLabel: formatTimeLabel(item.releaseAtSec),
-      });
-    }
+    await translateSingleSentence(item.text, {
+      timestamp: Date.now(),
+      timeLabel: formatTimeLabel(item.releaseAtSec),
+    });
   }
 }
 
-async function translateTranscriptSentences(sentences) {
+async function translateTranscriptSentences(sentences, options = {}) {
   for (const sentence of sentences) {
-    await translateSingleSentence(sentence);
+    if (options.shouldContinue && !options.shouldContinue()) return;
+    await translateSingleSentence(sentence, options);
   }
 }
 
@@ -141,6 +142,7 @@ async function translateSentencesBatch(sentences) {
 }
 
 async function translateSingleSentence(sentence, overrides = {}) {
+  if (overrides.shouldContinue && !overrides.shouldContinue()) return;
   const store = useStore.getState();
   const startedAt = performance.now();
   let translatedText = '';
@@ -167,6 +169,7 @@ async function translateSingleSentence(sentence, overrides = {}) {
       apiKey: store.apiKey,
       baseUrl: store.baseUrl,
       onToken: (tokenText) => {
+        if (overrides.shouldContinue && !overrides.shouldContinue()) return;
         translatedText += tokenText;
         useStore.getState().updateCurrentInterim({ en: sentence, zh: translatedText });
       },
@@ -174,10 +177,11 @@ async function translateSingleSentence(sentence, overrides = {}) {
       void token;
     }
   } catch (error) {
-    console.warn('[file-asr] translation fallback:', error);
-    translatedText = buildTransparentFallback(sentence, useStore.getState().glossary);
+    console.warn('[file-asr] translation failed:', error);
+    throw error;
   }
 
+  if (overrides.shouldContinue && !overrides.shouldContinue()) return;
   appendTranslatedSentence(sentence, translatedText, {
     startedAt,
     timestamp: overrides.timestamp ?? Date.now(),
@@ -201,6 +205,7 @@ function appendTranslatedSentence(sentence, translatedText, {
   });
   if (useStore.getState().voiceOutput) enqueueTTS(translatedText);
   if (startedAt) useStore.setState({ latencyMs: Math.round(performance.now() - startedAt) });
+  void reviseRecentSubtitle({ triggerText: sentence });
 }
 
 export function buildDemoTranslation(sentence, glossary = []) {
@@ -279,14 +284,19 @@ function splitLongSentence(sentence) {
 
 function findTerms(sentence, glossary) {
   const lower = sentence.toLowerCase();
-  return glossary
+  const matchedTerms = glossary
     .filter((term) => term.enabled && lower.includes(term.source.toLowerCase()))
-    .map((term) => term.source);
+    .map((term) => term.source)
+    .sort((a, b) => b.length - a.length);
+
+  return matchedTerms.filter((term, index) => (
+    matchedTerms.findIndex((candidate) => candidate.toLowerCase().includes(term.toLowerCase())) === index
+  ));
 }
 
 function buildTimedSentences(sentences, totalDurationSec) {
   const safeDuration = Number.isFinite(totalDurationSec) && totalDurationSec > 0
-    ? Math.min(totalDurationSec, sentences.length * 1.8)
+    ? totalDurationSec
     : sentences.length * 0.8;
   const totalWeight = sentences.reduce((sum, sentence) => sum + sentence.length, 0) || sentences.length;
   let cursor = 0;
@@ -306,10 +316,20 @@ function waitForAudioTime(audioElement, targetSec) {
   if (audioElement.currentTime >= targetSec) return Promise.resolve();
 
   return new Promise((resolve) => {
+    const timeout = globalThis.setTimeout(() => {
+      cleanup();
+      resolve();
+    }, Math.max(1200, Math.ceil((targetSec - audioElement.currentTime) * 1000) + 2500));
     const cleanup = () => {
+      globalThis.clearTimeout(timeout);
       audioElement.removeEventListener('timeupdate', handleTimeUpdate);
-      audioElement.removeEventListener('ended', cleanup);
+      audioElement.removeEventListener('ended', handleDone);
       audioElement.removeEventListener('pause', handlePause);
+      audioElement.removeEventListener('stalled', handleDone);
+    };
+    const handleDone = () => {
+      cleanup();
+      resolve();
     };
     const handleTimeUpdate = () => {
       if (audioElement.currentTime >= targetSec || audioElement.ended) {
@@ -324,8 +344,9 @@ function waitForAudioTime(audioElement, targetSec) {
       }
     };
     audioElement.addEventListener('timeupdate', handleTimeUpdate);
-    audioElement.addEventListener('ended', cleanup, { once: true });
+    audioElement.addEventListener('ended', handleDone, { once: true });
     audioElement.addEventListener('pause', handlePause);
+    audioElement.addEventListener('stalled', handleDone, { once: true });
     handleTimeUpdate();
   });
 }

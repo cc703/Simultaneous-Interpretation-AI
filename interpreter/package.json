@@ -12,6 +12,7 @@
     "smoke:file-asr": "node scripts/smoke-file-asr.mjs",
     "smoke:gateway-boundaries": "node scripts/smoke-gateway-boundaries.mjs",
     "smoke:media": "node scripts/smoke-media-scenarios.mjs",
+    "smoke:browser-ux": "python scripts/smoke-browser-ux.py",
     "smoke:final": "node --env-file-if-exists=.env scripts/smoke-final-closure.mjs",
     "scan:secrets": "node scripts/scan-secrets.mjs",
     "test": "node --test"

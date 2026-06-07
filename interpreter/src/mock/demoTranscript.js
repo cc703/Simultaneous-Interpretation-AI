@@ -8,6 +8,9 @@ export const demoScenarios = [
     terms: [
       { source: 'latency budget', target: '延迟预算', enabled: true },
       { source: 'pitch deck', target: '融资演示文稿', enabled: true },
+      { source: 'resource', target: '资源', enabled: true },
+      { source: 'online resource', target: '在线资源', enabled: true },
+      { source: 'sample files', target: '样本文件', enabled: true },
       { source: 'edge device', target: '边缘设备', enabled: false },
     ],
     transcript: [

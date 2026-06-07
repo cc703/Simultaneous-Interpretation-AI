@@ -10,6 +10,7 @@ import {
   Languages,
   ListChecks,
   PlayCircle,
+  ChevronDown,
   Upload,
   Wand2,
 } from 'lucide-react';
@@ -28,11 +29,13 @@ import {
   stopLiveASR,
   stopSTTSession,
   transcribeAudioFile,
-  translateTranscriptText,
   translateTranscriptTimed,
+  stopFileASRStream,
   stopSystemAudioCapture,
   initTTS,
   cancelTTS,
+  getTTSStats,
+  resetTTSStats,
   setTTSEnabled,
   setTTSLanguage,
   setTTSRate,
@@ -54,6 +57,23 @@ const SAMPLE_TRANSCRIPT = [
   'If a phrase is translated incorrectly, the user can correct it immediately.',
   'At the end, the bilingual transcript can be exported for review.',
 ].join(' ');
+
+function createLiveStats() {
+  return {
+    queued: 0,
+    processed: 0,
+    skipped: 0,
+    duplicates: 0,
+    lastLatencyMs: 0,
+    speechRateWpm: 0,
+    speechRateLevel: 'normal',
+    windowDurationSec: 0,
+    lastWords: 0,
+    overloads: 0,
+    backlog: 0,
+    asrUnstable: 0,
+  };
+}
 
 const TARGET_LANGUAGES = [
   { value: 'zh-CN', zh: '中文', en: 'Chinese' },
@@ -118,18 +138,34 @@ const UI_COPY = {
     readyBadge: '等待输入',
     readySource: 'Click Start Interpreting to play or capture English audio.',
     readyZh: '选择文件或直播源后点击开始，字幕会按时间逐句出现。',
+    liveNoAsrTitle: '直播音频已就绪，但 ASR 未配置。',
+    liveNoAsrBody: '请在设置中配置 ASR Key，或启动带 DASHSCOPE_API_KEY / OPENAI_API_KEY 的本地后端；系统不会生成假字幕。',
+    liveNeedAudioTitle: '请选择带音频的直播标签页或屏幕。',
+    liveNeedAudioBody: '点击“选择直播音频”，在浏览器弹窗中勾选共享标签页音频；如果只共享画面，系统会明确提示并不会伪装翻译。',
     recognizing: '识别中',
     correction: '翻译修正',
     saveCorrection: '保存修正',
+    correctionSaved: '已保存到人工确认记忆',
     retranslate: '术语重译',
     currentSubtitle: '当前字幕',
     translated: '字幕',
     corrections: '修正',
     glossary: '术语',
     provider: '引擎',
-    liveBoundary: 'Live 默认 1 秒低延迟分片；处理耗时按毫秒统计，但端到端仍受 ASR、翻译和网络影响。',
+    liveBoundary: 'Live 默认 2-3 秒低延迟语音窗；处理耗时按毫秒统计，但端到端仍受 ASR、翻译和网络影响。',
     liveUse: '适用于网页直播、社交直播、媒体直播和线上会议。',
     overlayHint: '打开字幕浮窗后，可以切到直播/会议页面观看，字幕会继续同步。',
+    controlDesk: '同传控制台',
+    streamInput: '实时音频流',
+    segmentEngine: '语义分段',
+    autoRevision: '自动回修',
+    accuracyFeedback: '同传质量',
+    noFormatRisk: '未发现格式风险',
+    speechRate: '语速检测',
+    fastSpeech: '语速偏快',
+    speechOverload: '语速过快',
+    unstableAsr: 'ASR 不稳定',
+    humanMemory: '人工确认',
     advancedSettings: '高级设置',
     advancedHint: '这些配置会影响后续识别、翻译和播报。',
     close: '关闭',
@@ -176,9 +212,14 @@ const UI_COPY = {
     readyBadge: 'Waiting',
     readySource: 'Click Start Interpreting to play or capture English audio.',
     readyZh: 'Select a file or live source, then captions will appear line by line.',
+    liveNoAsrTitle: 'Live audio is ready, but ASR is not configured.',
+    liveNoAsrBody: 'Configure an ASR key in Settings or start the local gateway with DASHSCOPE_API_KEY / OPENAI_API_KEY. The app will not generate fake captions.',
+    liveNeedAudioTitle: 'Choose a stream tab or screen with audio.',
+    liveNeedAudioBody: 'Click Choose live audio, then enable tab audio sharing in the browser picker. If only video is shared, the app reports the gap instead of pretending to translate.',
     recognizing: 'Recognizing',
     correction: 'Correction',
     saveCorrection: 'Save',
+    correctionSaved: 'Saved to human memory',
     retranslate: 'Retranslate',
     currentSubtitle: 'Current subtitle',
     translated: 'Captions',
@@ -188,6 +229,17 @@ const UI_COPY = {
     liveBoundary: 'Live defaults to 1s low-latency chunks. Processing is tracked in milliseconds, while end-to-end delay still depends on ASR, translation, and network.',
     liveUse: 'For web streams, social live rooms, media streams, and online meetings.',
     overlayHint: 'Open the caption overlay, then switch back to the stream tab. Captions keep syncing.',
+    controlDesk: 'Interpretation control',
+    streamInput: 'Live audio stream',
+    segmentEngine: 'Semantic segmentation',
+    autoRevision: 'Auto revision',
+    accuracyFeedback: 'Quality feedback',
+    noFormatRisk: 'No detected format risk',
+    speechRate: 'Speech rate',
+    fastSpeech: 'Fast speech',
+    speechOverload: 'Speech overload',
+    unstableAsr: 'Unstable ASR',
+    humanMemory: 'Human memory',
     advancedSettings: 'Advanced settings',
     advancedHint: 'These settings affect later recognition, translation, and voice output.',
     close: 'Close',
@@ -261,21 +313,27 @@ export default function App() {
   const [isSampleLoading, setIsSampleLoading] = useState(false);
   const [liveStatus, setLiveStatus] = useState('');
   const [liveStage, setLiveStage] = useState('idle');
-  const [liveStats, setLiveStats] = useState({ queued: 0, processed: 0, skipped: 0, duplicates: 0, lastLatencyMs: 0 });
+  const [liveStats, setLiveStats] = useState(createLiveStats);
   const [serverHealth, setServerHealth] = useState({ ok: false, hasOpenAIKey: false });
   const [settingsOpen, setSettingsOpen] = useState(false);
   const [captionOverlayOpen, setCaptionOverlayOpen] = useState(false);
+  const [correctionSavedMessage, setCorrectionSavedMessage] = useState('');
   const [configTab, setConfigTab] = useState('translate');
   const [uiLanguage, setUiLanguage] = useState('zh');
   const audioRef = useRef(null);
+  const testLiveAudioRef = useRef(null);
+  const testLiveAudioContextRef = useRef(null);
   const captionWindowRef = useRef(null);
+  const subtitleScrollRef = useRef(null);
   const copy = UI_COPY[uiLanguage];
   const displaySubtitles = subtitles;
+  const visibleSubtitles = useMemo(() => [...displaySubtitles].reverse(), [displaySubtitles]);
   const hasSubtitles = displaySubtitles.length > 0;
   const activeDemoScenario = getDemoScenario(demoScenarioId);
   const hasServerAsrKey = Boolean(serverHealth.ok && (serverHealth.hasAsrKey ?? serverHealth.hasOpenAIKey));
   const hasServerTranslationKey = Boolean(serverHealth.ok && (serverHealth.hasTranslationKey ?? serverHealth.hasOpenAIKey));
   const hasLiveAsr = Boolean(asrApiKey.trim() || hasServerAsrKey);
+  const effectiveChunkSeconds = Math.max(2, Number(chunkSeconds) || 3);
   const hasSignal = isRunning || isCapturing || currentInterim.en || hasSubtitles || fileProgress > 0;
   const showSubtitlePreview = showBanner && (isRunning || currentInterim.en || hasSubtitles);
   const nextAction = getNextAction({
@@ -296,6 +354,19 @@ export default function App() {
     () => buildCorrectionMemory(correctionHistory, displaySubtitles),
     [correctionHistory, displaySubtitles],
   );
+  const autoRevisionCount = useMemo(
+    () => displaySubtitles.filter((subtitle) => subtitle.correctionType === 'auto').length,
+    [displaySubtitles],
+  );
+  const emptySubtitleState = useMemo(() => getEmptySubtitleState({
+    copy,
+    sourceMode,
+    fileMeta,
+    liveStage,
+    liveStatus,
+    hasLiveAsr,
+    isCapturing,
+  }), [copy, sourceMode, fileMeta, liveStage, liveStatus, hasLiveAsr, isCapturing]);
   const selectedSubtitle = useMemo(() => (
     displaySubtitles.find((subtitle) => subtitle.id === selectedSubtitleId)
       ?? displaySubtitles.find((subtitle) => subtitle.isCurrent)
@@ -350,6 +421,15 @@ export default function App() {
   }, []);
 
   useEffect(() => {
+    if (!latestSubtitle?.id) return;
+    selectSubtitle(latestSubtitle.id);
+    window.requestAnimationFrame(() => {
+      const activeCard = subtitleScrollRef.current?.querySelector('[data-current-subtitle="true"]');
+      activeCard?.scrollIntoView({ block: 'nearest', behavior: 'smooth' });
+    });
+  }, [latestSubtitle?.id, selectSubtitle]);
+
+  useEffect(() => {
     getServerHealth({ refresh: true }).then(setServerHealth);
   }, []);
 
@@ -387,6 +467,7 @@ export default function App() {
     if (isRunning) {
       if (sourceMode === 'demo' || sourceMode === 'file') {
         stopDemoStream();
+        stopFileASRStream();
         stopAudioAnalyser();
         cancelTTS();
         audioRef.current?.pause();
@@ -395,6 +476,11 @@ export default function App() {
         stopAudioAnalyser();
         cancelTTS();
         stopLiveASR();
+        stopSystemAudioCapture(captureStream);
+        setCaptureStream(null, '');
+        setLiveStage('paused');
+        setLiveStatus('直播捕获已停止，正在收尾处理最后一段字幕。');
+        setLiveStats(createLiveStats());
         stopSTTSession();
       }
       return;
@@ -465,7 +551,6 @@ export default function App() {
     }
 
     const audio = audioRef.current;
-    audio?.play().catch((error) => console.warn('[file] preview playback failed:', error));
     useStore.getState().startTranslation();
     setFileStage('asr');
     setFileStatus(hasServerAsr && !asrApiKey.trim()
@@ -477,14 +562,19 @@ export default function App() {
     });
 
     try {
+      setFileStage('translate');
+      setFileStatus('正在对媒体音频做真实 ASR 预处理；完成后会按播放进度同步释放中文字幕，保证同传体验连续。');
       const transcript = await transcribeAudioFile({
         file,
         apiKey: asrApiKey,
         baseUrl: asrBaseUrl,
         model: asrModel,
       });
-      setFileStage('translate');
-      setFileStatus('语音切分完成，正在按播放进度进行语义理解、转译重组和字幕输出。');
+      setFileStatus('真实 ASR 已完成，正在播放媒体并按时间轴输出同传字幕。');
+      if (audio) {
+        audio.currentTime = 0;
+        await audio.play();
+      }
       await translateTranscriptTimed(transcript, {
         audioElement: audio,
         totalDurationSec: audio?.duration || 0,
@@ -500,6 +590,7 @@ export default function App() {
         zh: error.message || '真实 ASR 失败，请检查 Key、模型或网络。',
       });
     } finally {
+      stopFileASRStream();
       useStore.getState().stopTranslation();
     }
   };
@@ -512,6 +603,8 @@ export default function App() {
       'manual',
       '用户在修正编辑器中保存译文',
     );
+    setCorrectionSavedMessage(copy.correctionSaved);
+    window.setTimeout(() => setCorrectionSavedMessage(''), 2200);
   };
 
   const handleAddTerm = () => {
@@ -641,14 +734,14 @@ export default function App() {
       setCaptureStream(null, '');
       setLiveStage('paused');
       setLiveStatus('直播捕获已停止。');
-      setLiveStats({ queued: 0, processed: 0, skipped: 0, duplicates: 0, lastLatencyMs: 0 });
+      setLiveStats(createLiveStats());
       useStore.getState().stopTranslation();
       return;
     }
 
     setSourceMode('live');
     setLiveStage('requesting');
-    setLiveStats({ queued: 0, processed: 0, skipped: 0, duplicates: 0, lastLatencyMs: 0 });
+    setLiveStats(createLiveStats());
     setLiveStatus('正在请求标签页或屏幕音频权限...');
     const result = await startSystemAudioCapture({
       onAudioStream: ({ audioStream, label }) => {
@@ -667,7 +760,7 @@ export default function App() {
     startLiveAsrIfReady(result.audioStream);
   };
 
-  const startLiveAsrIfReady = (audioStream) => {
+  const startLiveAsrIfReady = (audioStream, options = {}) => {
     if (!hasLiveAsr) {
       setLiveStage('captured');
       setLiveStatus('Audio captured · ASR not configured。已捕获直播音频，但未配置 ASR Key，不生成直播假字幕。');
@@ -680,7 +773,9 @@ export default function App() {
         apiKey: asrApiKey,
         baseUrl: asrBaseUrl,
         model: asrModel,
-        chunkMs: chunkSeconds * 1000,
+        chunkMs: effectiveChunkSeconds * 1000,
+        forceNoAudioSignal: options.forceNoAudioSignal,
+        assumeAudibleSignal: options.assumeAudibleSignal,
         onStatus: setLiveStatus,
         onStats: setLiveStats,
       });
@@ -690,6 +785,118 @@ export default function App() {
       setLiveStatus(error.message || 'Live ASR 启动失败。');
     }
   };
+
+  useEffect(() => {
+    if (!shouldExposeTestHooks()) return undefined;
+
+    const startInjectedLiveSample = async ({ playbackRate = 1, label, status }) => {
+      if (!hasLiveAsr) throw new Error('Live sample test requires ASR key or server ASR key.');
+      stopAudioAnalyser();
+      stopLiveASR();
+      if (testLiveAudioRef.current) {
+        testLiveAudioRef.current.pause();
+        testLiveAudioRef.current = null;
+      }
+      if (testLiveAudioContextRef.current) {
+        await testLiveAudioContextRef.current.close();
+        testLiveAudioContextRef.current = null;
+      }
+
+      const audio = new Audio('/demo-media/sample-english-speech.wav');
+      audio.crossOrigin = 'anonymous';
+      audio.loop = false;
+      audio.playbackRate = playbackRate;
+      testLiveAudioRef.current = audio;
+      await waitForMediaReady(audio);
+      const audioContext = new AudioContext();
+      const source = audioContext.createMediaElementSource(audio);
+      const destination = audioContext.createMediaStreamDestination();
+      source.connect(destination);
+      source.connect(audioContext.destination);
+      testLiveAudioContextRef.current = audioContext;
+      const stream = destination.stream;
+      if (!stream.getAudioTracks().length) throw new Error('Browser cannot create the sample live audio stream.');
+
+      setSourceMode('live');
+      setCaptureStream(stream, label);
+      setLiveStage('running');
+      setLiveStats(createLiveStats());
+      setLiveStatus(status);
+      startStreamAnalyser(stream);
+      startLiveAsrIfReady(stream, { assumeAudibleSignal: true });
+      await audio.play();
+      return true;
+    };
+
+    window.__SIMULCAST_TEST__ = {
+      startLiveSample: () => startInjectedLiveSample({
+        label: 'Test-only injected sample media stream / 测试样本音频流',
+        status: '正在用样本音频流验证 Live 同传链路...',
+      }),
+      startFastLiveSample: () => startInjectedLiveSample({
+        playbackRate: 2.4,
+        label: 'Test-only fast injected sample media stream / 测试快语速样本音频流',
+        status: '正在用快语速样本验证 Live 语速检测...',
+      }),
+      getCaptionOverlayText: () => {
+        const overlayWindow = captionWindowRef.current;
+        if (!overlayWindow || overlayWindow.closed) return '';
+        return overlayWindow.document.getElementById('caption-overlay-root')?.innerText ?? '';
+      },
+      getTTSStats,
+      resetTTSStats,
+      startSilentLiveSample: async () => {
+        if (!hasLiveAsr) throw new Error('Silent live sample test requires ASR key or server ASR key.');
+        stopAudioAnalyser();
+        stopLiveASR();
+        if (testLiveAudioContextRef.current) {
+          await testLiveAudioContextRef.current.close();
+          testLiveAudioContextRef.current = null;
+        }
+
+        const audioContext = new AudioContext();
+        const destination = audioContext.createMediaStreamDestination();
+        const oscillator = audioContext.createOscillator();
+        const gain = audioContext.createGain();
+        gain.gain.value = 0;
+        oscillator.connect(gain);
+        gain.connect(destination);
+        oscillator.start();
+        testLiveAudioContextRef.current = audioContext;
+        const stream = destination.stream;
+
+        setSourceMode('live');
+        setCaptureStream(stream, 'Test-only silent media stream / 测试静音音频流');
+        setLiveStage('running');
+        setLiveStats(createLiveStats());
+        setLiveStatus('正在用静音样本验证 Live 无音频输入提示...');
+        startStreamAnalyser(stream);
+        startLiveAsrIfReady(stream, { forceNoAudioSignal: true });
+        return true;
+      },
+      stopLiveSample: () => {
+        stopAudioAnalyser();
+        stopLiveASR();
+        if (testLiveAudioRef.current) {
+          testLiveAudioRef.current.pause();
+          testLiveAudioRef.current = null;
+        }
+        if (testLiveAudioContextRef.current) {
+          testLiveAudioContextRef.current.close();
+          testLiveAudioContextRef.current = null;
+        }
+        const stream = useStore.getState().captureStream;
+        stopSystemAudioCapture(stream);
+        setCaptureStream(null, '');
+        setLiveStage('paused');
+        useStore.getState().stopTranslation();
+      },
+    };
+
+    return () => {
+      delete window.__SIMULCAST_TEST__;
+    };
+  }, [effectiveChunkSeconds, hasLiveAsr, setCaptureStream, setSourceMode]);
 
   return (
     <div className="app-shell">
@@ -749,6 +956,7 @@ export default function App() {
               <button
                 type="button"
                 className={sourceMode === 'demo' ? 'active' : ''}
+                disabled={(isRunning || isCapturing) && sourceMode !== 'demo'}
                 onClick={() => setSourceMode('demo')}
               >
                 <Sparkles size={14} />
@@ -757,6 +965,7 @@ export default function App() {
               <button
                 type="button"
                 className={sourceMode === 'mic' ? 'active' : ''}
+                disabled={(isRunning || isCapturing) && sourceMode !== 'mic'}
                 onClick={() => setSourceMode('mic')}
               >
                 <Mic size={14} />
@@ -765,6 +974,7 @@ export default function App() {
               <button
                 type="button"
                 className={sourceMode === 'file' ? 'active' : ''}
+                disabled={(isRunning || isCapturing) && sourceMode !== 'file'}
                 onClick={() => setSourceMode('file')}
               >
                 <FileAudio size={14} />
@@ -773,6 +983,7 @@ export default function App() {
               <button
                 type="button"
                 className={sourceMode === 'live' ? 'active' : ''}
+                disabled={(isRunning || isCapturing) && sourceMode !== 'live'}
                 onClick={() => setSourceMode('live')}
               >
                 <Radio size={14} />
@@ -791,9 +1002,11 @@ export default function App() {
               </strong>
               <span>
                 {sourceMode === 'file'
-                  ? (asrApiKey || hasServerAsrKey ? 'Real file ASR enabled · audio transcriptions API' : 'Use sample audio for stable demo · add ASR key for real transcription')
+                  ? fileMeta
+                    ? (asrApiKey || hasServerAsrKey ? 'Real media ASR ready · synced caption release' : 'Use sample audio for stable demo · add ASR key for real transcription')
+                    : (asrApiKey || hasServerAsrKey ? 'ASR provider ready · upload audio/video to transcribe' : 'Upload media · configure ASR for real transcription')
                   : sourceMode === 'live'
-                    ? (asrApiKey || hasServerAsrKey ? 'Live ASR chunks enabled · MediaRecorder' : 'Capture audio first · add ASR key or server key')
+                    ? (asrApiKey || hasServerAsrKey ? 'Media stream ASR enabled · semantic chunks' : 'Capture audio first · add ASR key or server key')
                   : sourceMode === 'demo'
                   ? 'Built-in English voice + streaming Chinese captions'
                   : (isSTTSupported()
@@ -876,7 +1089,18 @@ export default function App() {
                     Retry file ASR
                   </button>
                 )}
-                {fileUrl && (
+                {fileUrl && isVideoFile(fileMeta) && (
+                  <video
+                    ref={audioRef}
+                    controls
+                    src={fileUrl}
+                    onLoadedMetadata={handleAudioMetadata}
+                    onTimeUpdate={handleAudioTimeUpdate}
+                  >
+                    <track kind="captions" />
+                  </video>
+                )}
+                {fileUrl && !isVideoFile(fileMeta) && (
                   <audio
                     ref={audioRef}
                     controls
@@ -895,13 +1119,14 @@ export default function App() {
                 <button type="button" onClick={handleLiveCapture}>
                   {isCapturing ? copy.stopLive : copy.chooseLive}
                 </button>
-                <p>{copy.liveUse}</p>
+                <p>{copy.liveUse} 直播路径会持续读取当前共享标签页或屏幕的音频流，不注入第三方页面。</p>
                 <div className="live-state-grid" aria-label="Live interpretation status">
                   <LiveStateItem label="Source" value={captureSourceLabel || 'Not selected'} state={captureSourceLabel ? 'ok' : 'idle'} />
                   <LiveStateItem label="Permission" value={isCapturing ? 'Audio captured' : liveStage === 'requesting' ? 'Requesting' : 'Required'} state={isCapturing ? 'ok' : liveStage === 'requesting' ? 'warn' : 'idle'} />
                   <LiveStateItem label="ASR" value={hasLiveAsr ? 'Provider ready' : 'Not configured'} state={hasLiveAsr ? 'ok' : 'warn'} />
-                  <LiveStateItem label="Chunking" value={`${chunkSeconds}s chunks`} state="ok" />
-                  <LiveStateItem label="Output" value={hasSubtitles ? 'Captions ready' : 'Waiting'} state={hasSubtitles ? 'ok' : 'idle'} />
+                  <LiveStateItem label="Chunking" value={`${effectiveChunkSeconds}s + semantic`} state="ok" />
+                  <LiveStateItem label={copy.speechRate} value={formatSpeechRate(liveStats)} state={getSpeechRateState(liveStats)} />
+                  <LiveStateItem label="Output" value={getLiveOutputStateLabel({ hasSubtitles, liveStatus })} state={getLiveOutputState({ hasSubtitles, liveStatus })} />
                 </div>
                 <div className="live-boundary">
                   {copy.liveBoundary}
@@ -912,8 +1137,10 @@ export default function App() {
                 <div className="live-stats" aria-label="Live ASR queue statistics">
                   <span><strong>{liveStats.queued}</strong> Queued</span>
                   <span><strong>{liveStats.processed}</strong> Done</span>
-                  <span><strong>{liveStats.skipped}</strong> Silent</span>
+                  <span><strong>{liveStats.skipped}</strong> Skip</span>
                   <span><strong>{liveStats.duplicates}</strong> Dup</span>
+                  <span><strong>{formatSpeechRate(liveStats)}</strong> Rate</span>
+                  <span><strong>{liveStats.backlog ?? 0}</strong> Backlog</span>
                   <span><strong>{liveStats.lastLatencyMs ? `${liveStats.lastLatencyMs}ms` : '-'}</strong> Latency</span>
                 </div>
                 {liveStatus && <div className="file-status">{liveStatus}</div>}
@@ -993,6 +1220,33 @@ export default function App() {
             </div>
           </div>
 
+          <div className="quality-strip" aria-label="Real-time interpretation proof">
+            <div>
+              <span>{copy.controlDesk}</span>
+              <strong>{isRunning || isCapturing ? 'On air' : 'Ready'}</strong>
+            </div>
+            <div>
+              <span>{copy.streamInput}</span>
+              <strong>{sourceMode === 'live' ? (isCapturing ? 'Media stream' : 'Tab/screen') : sourceMode === 'file' ? 'Audio element' : sourceMode === 'mic' ? 'Microphone' : 'Demo stream'}</strong>
+            </div>
+            <div>
+              <span>{copy.segmentEngine}</span>
+              <strong>{sourceMode === 'live' || sourceMode === 'file' ? `${effectiveChunkSeconds}s + sentence` : 'final ASR units'}</strong>
+            </div>
+            <div>
+              <span>{copy.autoRevision}</span>
+              <strong>{autoCorrect ? `${autoRevisionCount} revised` : 'Off'}</strong>
+            </div>
+            <div>
+              <span>{copy.accuracyFeedback}</span>
+              <strong>{getQualityFeedbackLabel({ copy, qualitySummary, hasSubtitles, sourceMode, liveStats })}</strong>
+            </div>
+            <div>
+              <span>{copy.humanMemory}</span>
+              <strong>{correctionMemory.length ? `${correctionMemory.length} confirmed` : 'No entries'}</strong>
+            </div>
+          </div>
+
           {hasSignal && (
             <>
               <div className="waveform" aria-label="Audio waveform">
@@ -1010,7 +1264,7 @@ export default function App() {
             </>
           )}
 
-          <div className="subtitle-scroll">
+          <div className="subtitle-scroll" ref={subtitleScrollRef}>
             {displaySubtitles.length === 0 && !currentInterim.en && (
               <article className="subtitle-card empty-state">
                 <div className="subtitle-meta">
@@ -1018,12 +1272,10 @@ export default function App() {
                   <span>{copy.readyBadge}</span>
                 </div>
                 {shouldShowOriginal(subtitleMode, showOriginal) && (
-                  <p className="source-text">
-                    {copy.readySource}
-                  </p>
+                  <p className="source-text">{emptySubtitleState.source}</p>
                 )}
                 {shouldShowChinese(subtitleMode) && (
-                  <p className="translated-text">{copy.readyZh}</p>
+                  <p className="translated-text">{emptySubtitleState.target}</p>
                 )}
               </article>
             )}
@@ -1041,9 +1293,10 @@ export default function App() {
                 )}
               </article>
             )}
-            {displaySubtitles.map((subtitle) => (
+            {visibleSubtitles.map((subtitle) => (
               <SubtitleCard
                 analysis={qualitySummary.analyses.find((item) => item.subtitle.id === subtitle.id)}
+                isCurrent={subtitle.isCurrent}
                 isSelected={subtitle.id === selectedSubtitle?.id}
                 key={subtitle.id}
                 onSelect={() => selectSubtitle(subtitle.id)}
@@ -1070,6 +1323,7 @@ export default function App() {
                 <ClipboardCheck size={15} />
                 {copy.saveCorrection}
               </button>
+              {correctionSavedMessage && <span className="correction-saved">{correctionSavedMessage}</span>}
               <button
                 type="button"
                 onClick={() => retranslateSubtitle(selectedSubtitle.id)}
@@ -1247,9 +1501,9 @@ export default function App() {
               />
             </label>
             <label>
-                <span>音频分片长度：{chunkSeconds}s（低延迟建议 1s）</span>
+                <span>音频分片长度：{chunkSeconds}s（同传建议 2-3s）</span>
                 <input
-                min="1"
+                min="2"
                 max="10"
                 type="number"
                 value={chunkSeconds}
@@ -1323,6 +1577,34 @@ export default function App() {
   );
 }
 
+function waitForMediaReady(mediaElement) {
+  if (mediaElement.readyState >= 2) return Promise.resolve();
+  return new Promise((resolve, reject) => {
+    const cleanup = () => {
+      mediaElement.removeEventListener('canplay', handleReady);
+      mediaElement.removeEventListener('loadeddata', handleReady);
+      mediaElement.removeEventListener('error', handleError);
+    };
+    const handleReady = () => {
+      cleanup();
+      resolve();
+    };
+    const handleError = () => {
+      cleanup();
+      reject(new Error('Sample media failed to load for live stream test.'));
+    };
+    mediaElement.addEventListener('canplay', handleReady, { once: true });
+    mediaElement.addEventListener('loadeddata', handleReady, { once: true });
+    mediaElement.addEventListener('error', handleError, { once: true });
+    mediaElement.load();
+  });
+}
+
+function shouldExposeTestHooks() {
+  return typeof window !== 'undefined'
+    && (import.meta.env.DEV || import.meta.env.VITE_ENABLE_TEST_HOOKS === '1');
+}
+
 function formatBytes(bytes) {
   if (!bytes) return '0 B';
   const units = ['B', 'KB', 'MB', 'GB'];
@@ -1335,6 +1617,53 @@ function formatDuration(seconds) {
   const minutes = String(Math.floor(safe / 60)).padStart(2, '0');
   const rest = String(safe % 60).padStart(2, '0');
   return `${minutes}:${rest}`;
+}
+
+function isVideoFile(fileMeta) {
+  return String(fileMeta?.type ?? '').startsWith('video/');
+}
+
+function getEmptySubtitleState({
+  copy,
+  sourceMode,
+  fileMeta,
+  liveStage,
+  liveStatus,
+  hasLiveAsr,
+  isCapturing,
+}) {
+  if (sourceMode === 'live') {
+    if (!hasLiveAsr) {
+      return {
+        source: copy.liveNoAsrTitle,
+        target: copy.liveNoAsrBody,
+      };
+    }
+    if (liveStage === 'error' || liveStatus) {
+      return {
+        source: liveStatus || copy.liveNeedAudioTitle,
+        target: copy.liveNeedAudioBody,
+      };
+    }
+    if (!isCapturing) {
+      return {
+        source: copy.liveNeedAudioTitle,
+        target: copy.liveNeedAudioBody,
+      };
+    }
+  }
+
+  if (sourceMode === 'file' && !fileMeta) {
+    return {
+      source: 'Upload audio or video to start real ASR.',
+      target: '上传音频或视频后，系统会提取音频轨并按播放进度输出同传字幕。',
+    };
+  }
+
+  return {
+    source: copy.readySource,
+    target: copy.readyZh,
+  };
 }
 
 function correctionLabel(type) {
@@ -1390,17 +1719,21 @@ function getWaveformLevel(waveformData, index) {
   return Math.max(8, Math.round((value / 255) * 70));
 }
 
-function SubtitleCard({ subtitle, analysis, isSelected, onSelect, showOriginal, showChinese }) {
+function SubtitleCard({ subtitle, analysis, isCurrent, isSelected, onSelect, showOriginal, showChinese }) {
+  const [expanded, setExpanded] = useState(false);
   const visibleIssues = analysis?.issues ?? [];
+  const isLong = (subtitle.en?.length ?? 0) > 90 || (subtitle.zh?.length ?? 0) > 48;
 
   return (
     <article
-      className={`subtitle-card ${subtitle.correctionType ?? ''} ${isSelected ? 'selected' : ''} ${analysis?.riskLevel === 'risk' ? 'risk' : ''}`}
+      className={`subtitle-card ${subtitle.correctionType ?? ''} ${isCurrent ? 'current' : ''} ${isSelected ? 'selected' : ''} ${analysis?.riskLevel === 'risk' ? 'risk' : ''} ${expanded ? 'expanded' : 'collapsed'}`}
+      data-current-subtitle={isCurrent ? 'true' : undefined}
       onClick={onSelect}
     >
       <div className="subtitle-meta">
         <time>{subtitle.timeLabel}</time>
         <div className="subtitle-badges">
+          {isCurrent && <span className="current-badge">当前同传</span>}
           {subtitle.correctionType && (
             <span>{correctionLabel(subtitle.correctionType)}</span>
           )}
@@ -1411,6 +1744,20 @@ function SubtitleCard({ subtitle, analysis, isSelected, onSelect, showOriginal, 
       </div>
       {showOriginal && <p className="source-text">{subtitle.en}</p>}
       {showChinese && <p className="translated-text">{subtitle.zh}</p>}
+      {isLong && (
+        <button
+          aria-label={expanded ? 'Collapse subtitle' : 'Expand subtitle'}
+          className="subtitle-expand"
+          type="button"
+          onClick={(event) => {
+            event.stopPropagation();
+            setExpanded((current) => !current);
+            onSelect();
+          }}
+        >
+          <ChevronDown size={14} />
+        </button>
+      )}
       {subtitle.termsApplied.length > 0 && (
         <div className="term-hits">
           {subtitle.termsApplied.map((term) => <code key={term}>{term}</code>)}
@@ -1484,6 +1831,52 @@ function getRunButtonLabel({ isRunning, sourceMode, isCapturing, copy }) {
   if (isRunning) return 'Stop Interpreting';
   if (sourceMode === 'live') return isCapturing ? copy.stopLive : copy.chooseLive;
   return copy.start;
+}
+
+function formatSpeechRate(liveStats) {
+  const wpm = Number(liveStats?.speechRateWpm ?? 0);
+  return wpm > 0 ? `${wpm} WPM` : 'Listening';
+}
+
+function getSpeechRateState(liveStats) {
+  if (liveStats?.speechRateLevel === 'overload') return 'danger';
+  if (liveStats?.speechRateLevel === 'fast' || liveStats?.speechRateLevel === 'unstable' || liveStats?.asrUnstable > 0) return 'warn';
+  return liveStats?.speechRateWpm ? 'ok' : 'idle';
+}
+
+function getQualityFeedbackLabel({ copy, qualitySummary, hasSubtitles, sourceMode, liveStats }) {
+  if (sourceMode === 'live' && liveStats?.speechRateLevel === 'overload') {
+    return `${copy.speechOverload} ${liveStats.speechRateWpm || ''} WPM`.trim();
+  }
+  if (sourceMode === 'live' && liveStats?.speechRateLevel === 'fast') {
+    return `${copy.fastSpeech} ${liveStats.speechRateWpm || ''} WPM`.trim();
+  }
+  if (sourceMode === 'live' && liveStats?.asrUnstable > 0) {
+    return `${copy.unstableAsr} ${liveStats.asrUnstable}`;
+  }
+  if (qualitySummary.riskCount) return `${qualitySummary.riskCount} risk`;
+  if (hasSubtitles) return copy.noFormatRisk;
+  return 'Waiting';
+}
+
+function getLiveOutputStateLabel({ hasSubtitles, liveStatus }) {
+  if (hasSubtitles) return 'Captions ready';
+  if (/没有实际音量|无有效音量|未检测到实际音量|共享标签页音频|audio is empty/i.test(liveStatus ?? '')) {
+    return 'No audible input';
+  }
+  if (/语速过快|语速偏快|ASR 未稳定捕获|音频存在/i.test(liveStatus ?? '')) return 'Speech overload';
+  if (/未检测到清晰语音/i.test(liveStatus ?? '')) return 'ASR unstable';
+  return 'Waiting';
+}
+
+function getLiveOutputState({ hasSubtitles, liveStatus }) {
+  if (hasSubtitles) return 'ok';
+  if (/语速过快|语速偏快/i.test(liveStatus ?? '')) return 'danger';
+  if (/ASR 未稳定捕获|音频存在|未检测到清晰语音/i.test(liveStatus ?? '')) return 'warn';
+  if (/没有实际音量|无有效音量|未检测到实际音量|共享标签页音频|audio is empty/i.test(liveStatus ?? '')) {
+    return 'warn';
+  }
+  return 'idle';
 }
 
 function getLivePrimaryAction({ isCapturing, liveStage, hasLiveAsr }) {

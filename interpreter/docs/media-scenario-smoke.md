@@ -1,15 +1,16 @@
 # 多媒体场景烟测记录
 
-测试时间：2026/6/6 22:29:26 +08:00
+测试时间：2026/6/7 17:39:19 +08:00
 
 本记录用于验证题目二“AI 同声传译助手”的多输入能力。真实 Key 只保存在本地 `.env`，报告只记录脱敏状态、字符数和短预览。
 
 | 场景 | 文件 | 状态 | HTTP | 字符数 | 延迟 ms | 脱敏预览 |
 | --- | --- | --- | --- | --- | --- | --- |
-| english-speech-wav | test-media/sample-english-speech.wav | pass | 200 | 973 | 3301 | Welcome to SampleLab dot com, a free online resource for downloading sample file |
-| music-only-wav | test-media/sample-music-tone.wav | pass | 200 | 0 | 300 |  |
-| english-video-mp4 | test-media/sample-english-video.mp4 | pass | 200 | 104 | 609 | Welcome to SampleLab. dot com, a free online resource for downloading sample fil |
-| live-chunk-wav | test-media/sample-live-chunk.wav | pass | 200 | 103 | 578 | Welcome to SampleLab dot com, a free online resource for downloading sample file |
+| english-speech-wav | test-media/sample-english-speech.wav | pass | 200 | 973 | 2662 | Welcome to SampleLab dot com, a free online resource for downloading sample file |
+| music-only-wav | test-media/sample-music-tone.wav | pass | 200 | 0 | 335 |  |
+| english-video-mp4 | test-media/sample-english-video.mp4 | pass | 200 | 104 | 671 | Welcome to SampleLab. dot com, a free online resource for downloading sample fil |
+| live-chunk-wav | test-media/sample-live-chunk.wav | pass | 200 | 104 | 524 | Welcome to SampleLab. dot com, a free online resource for downloading sample fil |
+| live-chunk-webm | test-media/sample-live-chunk.webm | pass | 200 | 103 | 578 | Welcome to SampleLab dot com, a free online resource for downloading sample file |
 
 ## 结论
 

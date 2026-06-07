@@ -10,7 +10,7 @@
 
 PR-14：演示材料与提交文案完善。
 
-当前已建立 Vite + React 前端工程和 Node 后端代理，完成同传字幕工作台、Web Speech API STT、OpenAI-compatible 流式翻译、DashScope Qwen-ASR 后端代理、翻译修正闭环、稳定 Demo 模式、文件上传真实转写、直播标签页/屏幕音频捕获与 MediaRecorder 分片 ASR、直播字幕浮窗、高级设置、Web Audio 波形、浏览器 TTS、SRT / 双语文本导出。页面按“听音接入、语音切分、语义理解、转译重组、字幕输出、修正沉淀”组织 File 和 Live 工作流，包含输入源选择、语言路由、Provider 配置、File/Live ASR 配置、演示场景/术语预设、时间轴字幕流、按需出现的修正编辑器、底部字幕预览和统计栏。
+当前已建立 Vite + React 前端工程和 Node 后端代理，完成同传字幕工作台、Web Speech API STT、OpenAI-compatible 流式翻译、DashScope Qwen-ASR 后端代理、翻译修正闭环、稳定 Demo 模式、文件上传真实转写、直播标签页/屏幕音频捕获与 MediaRecorder 分片 ASR、WebM/Opus 直播片段转码、快语速/静音/ASR 不稳定检测、直播字幕浮窗、高级设置、Web Audio 波形、浏览器 TTS、SRT / 双语文本导出。页面按“听音接入、语音切分、语义理解、转译重组、字幕输出、修正沉淀”组织 File 和 Live 工作流，包含输入源选择、语言路由、Provider 配置、File/Live ASR 配置、演示场景/术语预设、时间轴字幕流、按需出现的修正编辑器、底部字幕预览和统计栏。
 
 Demo 视频：待录制，提交前替换为公开可访问链接。
 
@@ -74,11 +74,12 @@ npm run check:api
 npm run smoke:file-asr
 npm run smoke:media
 npm run smoke:gateway-boundaries
+npm run smoke:browser-ux
 npm run smoke:final
 npm run build
 ```
 
-`npm test` 使用 Node 原生测试覆盖质量诊断、修正记忆、SRT 和导出报告生成函数。`npm run smoke:file-asr` 会使用 `test-media/sample-english-speech.wav` 上传到本地后端；未配置 `DASHSCOPE_API_KEY` 或其他 ASR Key 时应明确通过 `missing_server_key` 边界测试，配置 Key 后会要求返回真实英文转写。`npm run smoke:final` 会聚合构建、单测、API、File、媒体、Gateway 和密钥扫描。样本来源和下载方式见 `docs/file-asr-smoke.md`。
+`npm test` 使用 Node 原生测试覆盖质量诊断、自动回修、快语速/静音检测、修正记忆、SRT 和导出报告生成函数。`npm run smoke:file-asr` 会使用 `test-media/sample-english-speech.wav` 上传到本地后端；未配置 `DASHSCOPE_API_KEY` 或其他 ASR Key 时应明确通过 `missing_server_key` 边界测试，配置 Key 后会要求返回真实英文转写。`npm run smoke:media` 覆盖音频、视频、音乐无语音、WAV Live 分片和浏览器常见 WebM/Opus Live 分片。`npm run smoke:browser-ux` 会在浏览器中验证 Demo、文件、视频、注入 MediaStream 直播样本、字幕浮窗、快语速、静音、TTS 调用、人工修正和 SRT 导出。`npm run smoke:final` 会聚合构建、单测、API、File、媒体、Gateway、浏览器体验和密钥扫描。样本来源和下载方式见 `docs/file-asr-smoke.md`。
 
 ## STT 验证
 
@@ -124,13 +125,14 @@ Chrome 或 Edge 中打开本地页面，点击输入源 `麦克风`，再点击 
 ## 直播模式验证
 
 1. 点击输入源 `直播`。
-2. Live 面向网页直播、社交平台直播、媒体直播和线上会议；产品路径为 `选择直播源 -> 捕获浏览器音频 -> 1 秒低延迟分片 ASR -> 目标语言字幕 -> 修正导出`。
+2. Live 面向网页直播、社交平台直播、媒体直播和线上会议；产品路径为 `选择直播源 -> 捕获浏览器音频 -> 2-3 秒自适应语义窗 ASR -> 目标语言字幕 -> 修正导出`。
 3. 推荐启动已配置 `DASHSCOPE_API_KEY` 的本地后端代理；Live 会复用同一套 `/api/transcribe` 配置。若使用 OpenAI ASR，可把 `.env` 中 `ASR_PROVIDER` 改为 `openai`。
 4. 点击 `选择直播音频`，选择一个带英文音频的浏览器标签页或屏幕，并确认共享音频。
-5. 左侧会显示捕获来源、权限状态、ASR 配置状态、分片长度、字幕输出状态和 Live 统计；`Latency` 是最近片段的 ASR/翻译处理耗时，按毫秒展示。
+5. 左侧会显示捕获来源、权限状态、ASR 配置状态、分片长度、语速 WPM、字幕输出状态和 Live 统计；`Latency` 是最近片段的 ASR/翻译处理耗时，按毫秒展示。
 6. 点击顶部 `浮窗` 可打开字幕浮窗；Chromium 支持时会使用 Document Picture-in-Picture，用户可以切回直播/会议页面并把字幕浮窗放在画面上方。
-7. 如果浏览器支持 MediaRecorder，系统会按设置的音频分片长度持续转写直播音频，并把转写文本送入翻译链路。
+7. 如果浏览器支持 MediaRecorder，系统会按自适应语义窗持续转写直播音频，并把转写文本送入翻译链路；浏览器输出的 WebM/Opus 片段会在 Gateway 转成 16kHz mono WAV 后送入 DashScope ASR。
 8. 未填写浏览器 ASR Key 且后端没有配置 Key 时，Live 只展示捕获、波形和配置缺口，不会伪装为真实转写。
+9. 如果共享的标签页没有勾选音频或音量长期为 0，系统会显示无音频提示；如果有声音但语速过快或 ASR 不稳定，会显示快语速/ASR 不稳定反馈，不会错误标成静音。
 
 ## 设置面板验证
 
@@ -170,11 +172,12 @@ Chrome 或 Edge 中打开本地页面，点击输入源 `麦克风`，再点击 
 - 麦克风英文语音实时识别与中文字幕输出：已完成浏览器 Web Speech API MVP。
 - 文件音频真实 ASR：已完成 DashScope Qwen-ASR 国产后端代理入口，并保留 OpenAI `/audio/transcriptions` 可选入口；未配置 Key 时降级为稳定演示流。
 - Demo 音频流：已完成英文语音模拟 + 中文流式字幕，用于无 Key 稳定演示。
+- Live 直播音频流：已完成浏览器标签页/屏幕音频捕获、MediaRecorder 语义窗分片、WebM/Opus 转 WAV、快语速检测、静音检测、停止时收尾 flush 和字幕浮窗同步。
 - AI 流式翻译：已完成 OpenAI-compatible SSE 引擎、Provider 配置与 `/api/translate` 服务端代理。
 - 人工修正字幕译文：已完成。
 - 术语表与术语命中：已完成。
 - 质量诊断与修正记忆：已完成，支持风险标签和用户修正记忆 prompt。
-- 上下文自动重译：已完成术语重译入口，后续可扩展更多上下文策略。
+- 上下文自动回修：已完成近期字幕基于后续语境的自动回修，并保护用户人工确认的译文不被覆盖。
 - SRT / 双语文本导出：已完成。
 - 导出报告生成函数：已完成，包含风险诊断、术语表、修正记录和完整双语转写；当前页面主入口保留 SRT 导出和双语文本复制。
 - 可选 TTS 播报：已完成浏览器原生语音输出，播报语言跟随目标语言。
@@ -184,9 +187,9 @@ Chrome 或 Edge 中打开本地页面，点击输入源 `麦克风`，再点击 
 当前作品聚焦比赛题目二要求的“外语音频流实时翻译成中文、字幕/语音输出、翻译修正能力”。为了保证 72 小时内可稳定演示，系统提供三层能力：
 
 - 稳定评审闭环：Demo 模式可以在无 Key 情况下稳定展示“外语音频流输入 -> 目标语言字幕输出 -> 人工修正 -> 术语重译 -> TTS 播报 -> 导出”。
-- 真实浏览器能力：Mic 使用 Web Speech API 做英文语音识别；File 模式可通过本地 Gateway 调用 DashScope 或可选 OpenAI ASR 做真实文件转写；Live 模式可通过 MediaRecorder 分片调用 ASR；Provider 配置后可走真实 OpenAI-compatible 流式翻译。
-- 翻译修正能力：人工修正会写入修正记忆，并作为后续翻译提示的一部分；质量诊断可提示漏译、术语未命中和占位翻译。
-- 能力限制：Live ASR 依赖浏览器 MediaRecorder、用户共享音频权限、ASR Key 和网络质量；默认 1 秒低延迟分片，处理耗时按毫秒统计，但端到端延迟仍取决于音频分片、ASR、翻译和网络，不承诺零延迟。
+- 真实浏览器能力：Mic 使用 Web Speech API 做英文语音识别；File 模式可通过本地 Gateway 调用 DashScope 或可选 OpenAI ASR 做真实文件转写；Live 模式可通过 MediaRecorder 持续读取当前共享标签页或屏幕音频并分片调用 ASR；Provider 配置后可走真实 OpenAI-compatible 流式翻译。
+- 翻译修正能力：自动回修会基于后续语境修正近期字幕，人工修正会写入修正记忆并作为后续翻译提示的一部分；质量诊断可提示漏译、术语未命中和占位翻译。
+- 能力限制：Live ASR 依赖浏览器 MediaRecorder、用户共享音频权限、ASR Key 和网络质量；默认 2-3 秒自适应语义窗，处理耗时按毫秒统计，但端到端延迟仍取决于音频分片、ASR、翻译和网络，不承诺零延迟。自动化测试可证明注入 MediaStream 和 WebM/Opus 片段链路；真实 DY/会议/直播标签页仍需要用户在浏览器权限弹窗中手动选择并勾选共享音频。
 - 浮窗边界：字幕浮窗是浏览器 Picture-in-Picture 或弹出窗口能力，不直接注入或修改第三方直播、会议、媒体网站的页面结构。
 
 ## 已完成 PR 记录
@@ -207,6 +210,6 @@ Chrome 或 Edge 中打开本地页面，点击输入源 `麦克风`，再点击 
 
 ## 后续扩展
 
-- 优化 Live ASR 分片去重、静音过滤和延迟统计。
-- 增加自动质量评估，例如延迟、漏译率、术语命中率和人工修正前后对比。
+- 增加云端长直播录制/断点续传和更长会话的字幕检索。
+- 增加更完整的真人录屏评测，例如不同平台共享音频、实际外放 TTS 和人工口译质量评分。
 - 提交前录制 Demo 视频，并将公开链接替换到 README 顶部。

@@ -29,7 +29,9 @@ export {
 export {
   cancelTTS,
   enqueueTTS,
+  getTTSStats,
   initTTS,
+  resetTTSStats,
   setTTSEnabled,
   setTTSLanguage,
   setTTSRate,
@@ -40,7 +42,18 @@ export {
   translateTranscriptTimed,
 } from './asrAdapter.js';
 export {
+  isFileASRStreamSupported,
+  startFileASRStream,
+  stopFileASRStream,
+  takeCompleteSentences,
+} from './fileAsrStream.js';
+export {
   isLiveASRSupported,
   startLiveASR,
   stopLiveASR,
 } from './liveAsr.js';
+export {
+  isNoiseUtterance,
+  shouldFlushSoftBoundary,
+  takeInterpretationUnits,
+} from './streamSegmenter.js';

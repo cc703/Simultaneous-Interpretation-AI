@@ -64,7 +64,7 @@ export const useStore = create((set, get) => ({
   targetLanguage: savedSettings.targetLanguage ?? 'zh-CN',
   translationStyle: savedSettings.translationStyle ?? 'formal',
   contextWindow: savedSettings.contextWindow ?? 6,
-  chunkSeconds: savedSettings.chunkSeconds ?? 1,
+  chunkSeconds: savedSettings.chunkSeconds ?? 3,
   terminologyBoost: savedSettings.terminologyBoost ?? true,
 
   // 运行状态
@@ -145,7 +145,7 @@ export const useStore = create((set, get) => ({
     get().persistUserSettings();
   },
   setChunkSeconds: (chunkSeconds) => {
-    const nextChunkSeconds = Math.max(1, Math.min(10, Number(chunkSeconds) || 1));
+    const nextChunkSeconds = Math.max(2, Math.min(10, Number(chunkSeconds) || 3));
     set({ chunkSeconds: nextChunkSeconds });
     get().persistUserSettings();
   },
@@ -243,6 +243,41 @@ export const useStore = create((set, get) => ({
           beforeZh: target.zh,
           afterZh: newZh,
           type,
+          reason,
+          createdAt: Date.now(),
+        },
+      ],
+    };
+  }),
+
+  reviseSubtitleTranslation: (
+    id,
+    newZh,
+    reason = '根据后续上下文自动回修',
+  ) => set((state) => {
+    const target = state.subtitles.find((subtitle) => subtitle.id === id);
+    if (!target || ![null, 'auto'].includes(target.correctionType) || target.zh === newZh) return state;
+
+    return {
+      subtitles: state.subtitles.map((subtitle) => (
+        subtitle.id === id
+          ? {
+            ...subtitle,
+            zh: newZh,
+            corrected: true,
+            correctionType: 'auto',
+          }
+          : subtitle
+      )),
+      correctionCount: state.correctionCount + 1,
+      correctionHistory: [
+        ...state.correctionHistory,
+        {
+          id: nanoid(),
+          subtitleId: id,
+          beforeZh: target.zh,
+          afterZh: newZh,
+          type: 'auto',
           reason,
           createdAt: Date.now(),
         },

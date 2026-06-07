@@ -7,6 +7,16 @@ class TTSEngine {
     this._voice = null;
     this._lang = 'zh-CN';
     this._keepAliveTimer = null;
+    this._stats = {
+      queued: 0,
+      spoken: 0,
+      dropped: 0,
+      cancelled: 0,
+      lastText: '',
+      lastLang: '',
+      lastRate: 0,
+      status: 'idle',
+    };
   }
 
   async init() {
@@ -17,23 +27,34 @@ class TTSEngine {
   }
 
   enqueue(text) {
-    if (!this._enabled || !text || !this._isAvailable()) return;
+    if (!this._enabled || !text || !this._isAvailable()) {
+      this._stats.status = this._enabled ? 'unavailable' : 'disabled';
+      return;
+    }
 
     if (this._queue.length > 3) {
       this._queue.shift();
+      this._stats.dropped += 1;
       console.warn('[TTS] queue overflow, dropping oldest item');
     }
 
     const rate = this._queue.length > 1 ? Math.min(1.5, this._rate * 1.15) : this._rate;
     this._queue.push({ text, rate, lang: this._lang });
+    this._stats.queued += 1;
+    this._stats.lastText = text;
+    this._stats.lastLang = this._lang;
+    this._stats.lastRate = rate;
+    this._stats.status = 'queued';
     if (!this._isSpeaking) this._processQueue();
   }
 
   cancel() {
     if (!this._isAvailable()) return;
-    speechSynthesis.cancel();
+    getSpeechSynthesis()?.cancel();
     this._queue = [];
     this._isSpeaking = false;
+    this._stats.cancelled += 1;
+    this._stats.status = 'cancelled';
   }
 
   setEnabled(enabled) {
@@ -57,7 +78,35 @@ class TTSEngine {
     utterance.lang = lang;
     utterance.rate = Number(rate) || this._rate;
     utterance.pitch = 1.0;
-    speechSynthesis.speak(utterance);
+    this._stats.spoken += 1;
+    this._stats.lastText = text;
+    this._stats.lastLang = lang;
+    this._stats.lastRate = utterance.rate;
+    this._stats.status = 'speaking';
+    getSpeechSynthesis()?.speak(utterance);
+  }
+
+  getStats() {
+    return {
+      ...this._stats,
+      enabled: this._enabled,
+      speaking: this._isSpeaking || Boolean(getSpeechSynthesis()?.speaking),
+      queueLength: this._queue.length,
+      available: this._isAvailable(),
+    };
+  }
+
+  resetStats() {
+    this._stats = {
+      queued: 0,
+      spoken: 0,
+      dropped: 0,
+      cancelled: 0,
+      lastText: '',
+      lastLang: '',
+      lastRate: 0,
+      status: 'idle',
+    };
   }
 
   _processQueue() {
@@ -74,17 +123,23 @@ class TTSEngine {
     utterance.lang = item.lang;
     utterance.rate = item.rate;
     utterance.pitch = 1.0;
-    utterance.onend = () => this._processQueue();
+    this._stats.spoken += 1;
+    this._stats.status = 'speaking';
+    utterance.onend = () => {
+      this._stats.status = this._queue.length ? 'queued' : 'idle';
+      this._processQueue();
+    };
     utterance.onerror = (event) => {
       console.warn('[TTS] error:', event.error);
+      this._stats.status = 'error';
       this._processQueue();
     };
 
-    speechSynthesis.speak(utterance);
+    getSpeechSynthesis()?.speak(utterance);
   }
 
   _selectBestChineseVoice() {
-    const voices = speechSynthesis.getVoices();
+    const voices = getSpeechSynthesis()?.getVoices() ?? [];
     const priority = [
       (voice) => voice.name.includes('Microsoft') && voice.lang.startsWith('zh'),
       (voice) => voice.name.includes('Google') && voice.lang.startsWith('zh'),
@@ -100,7 +155,7 @@ class TTSEngine {
   }
 
   _selectVoiceForLang(lang) {
-    const voices = speechSynthesis.getVoices();
+    const voices = getSpeechSynthesis()?.getVoices() ?? [];
     return voices.find((voice) => voice.lang === lang)
       ?? voices.find((voice) => voice.lang?.startsWith(lang.split('-')[0]))
       ?? null;
@@ -108,28 +163,42 @@ class TTSEngine {
 
   _waitForVoices() {
     return new Promise((resolve) => {
-      if (speechSynthesis.getVoices().length > 0) {
+      const synth = getSpeechSynthesis();
+      if (!synth) {
         resolve();
         return;
       }
-      speechSynthesis.onvoiceschanged = () => resolve();
-      window.setTimeout(resolve, 800);
+      if (synth.getVoices().length > 0) {
+        resolve();
+        return;
+      }
+      synth.onvoiceschanged = () => resolve();
+      getWindow()?.setTimeout?.(resolve, 800) ?? setTimeout(resolve, 800);
     });
   }
 
   _startKeepAlive() {
     if (this._keepAliveTimer) return;
-    this._keepAliveTimer = window.setInterval(() => {
-      if (speechSynthesis.speaking) {
-        speechSynthesis.pause();
-        speechSynthesis.resume();
+    const timerHost = getWindow() ?? globalThis;
+    this._keepAliveTimer = timerHost.setInterval(() => {
+      if (getSpeechSynthesis()?.speaking) {
+        getSpeechSynthesis()?.pause();
+        getSpeechSynthesis()?.resume();
       }
     }, 10000);
   }
 
   _isAvailable() {
-    return typeof window !== 'undefined' && 'speechSynthesis' in window;
+    return Boolean(getSpeechSynthesis()) && typeof SpeechSynthesisUtterance !== 'undefined';
   }
+}
+
+function getSpeechSynthesis() {
+  return globalThis.speechSynthesis ?? globalThis.window?.speechSynthesis ?? null;
+}
+
+function getWindow() {
+  return typeof window !== 'undefined' ? window : globalThis.window ?? null;
 }
 
 export const ttsEngine = new TTSEngine();
@@ -160,4 +229,12 @@ export function setTTSLanguage(lang) {
 
 export function speakOnce(text, options) {
   ttsEngine.speakOnce(text, options);
+}
+
+export function getTTSStats() {
+  return ttsEngine.getStats();
+}
+
+export function resetTTSStats() {
+  ttsEngine.resetStats();
 }
