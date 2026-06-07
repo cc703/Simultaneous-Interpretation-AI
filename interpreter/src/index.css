@@ -827,7 +827,7 @@ button {
   min-width: 0;
   min-height: calc(100vh - 64px);
   display: grid;
-  grid-template-rows: auto auto auto 56px 3px minmax(250px, 1fr) auto auto auto 42px;
+  grid-template-rows: auto auto minmax(250px, 1fr) auto auto auto 42px;
   background: rgba(11, 15, 25, 0.78);
 }
 
@@ -979,35 +979,6 @@ button {
 .demo-proof-grid strong {
   color: var(--text);
   font-size: 13px;
-}
-
-.waveform {
-  display: flex;
-  align-items: center;
-  gap: 5px;
-  padding: 0 18px;
-  border-bottom: 1px solid var(--border);
-}
-
-.waveform span {
-  width: 100%;
-  height: var(--level);
-  max-height: 38px;
-  min-height: 8px;
-  border-radius: 999px;
-  background: var(--accent);
-  opacity: 0.55;
-}
-
-.progress-track {
-  background: rgba(148, 163, 184, 0.14);
-}
-
-.progress-track span {
-  display: block;
-  width: 58%;
-  height: 100%;
-  background: var(--green);
 }
 
 .subtitle-scroll {
@@ -1640,7 +1611,7 @@ textarea.editor-preview {
   }
 
   .right-panel {
-    grid-template-rows: auto auto auto 56px 3px minmax(240px, 50vh) auto auto auto auto;
+    grid-template-rows: auto auto minmax(240px, 50vh) auto auto auto auto;
   }
 
   .correction-editor {
@@ -1823,7 +1794,7 @@ body {
 }
 
 .right-panel {
-  grid-template-rows: auto auto auto minmax(260px, 1fr) auto auto 42px;
+  grid-template-rows: auto auto minmax(260px, 1fr) auto auto 42px;
   background: rgba(7, 10, 18, 0.55);
 }
 
@@ -1880,16 +1851,6 @@ body {
   color: #06111f;
   background: #e5eefc;
   font-weight: 850;
-}
-
-.waveform {
-  padding: 0 24px;
-  border-bottom-color: rgba(148, 163, 184, 0.1);
-}
-
-.waveform span {
-  background: #e5eefc;
-  opacity: 0.45;
 }
 
 .subtitle-scroll {
@@ -1958,7 +1919,7 @@ body {
   }
 
   .right-panel {
-    grid-template-rows: auto auto auto minmax(260px, 50vh) auto auto auto;
+    grid-template-rows: auto auto minmax(260px, 50vh) auto auto auto;
   }
 
   .language-route {

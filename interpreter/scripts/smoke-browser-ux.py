@@ -92,6 +92,7 @@ def run_demo(page):
     page.locator("button.run-button").click()
     wait_for_stable_chinese_caption(page, timeout_ms=12000)
     wait_for_semantic_translation(page, ["全球", "产品", "发布"], timeout_ms=16000)
+    assert_no_waveform_block(page)
     page.screenshot(path=str(OUT_DIR / "ux-demo.png"), full_page=True)
     text = page.locator(".subtitle-scroll").inner_text(timeout=5000)
     control = page.locator(".quality-strip").inner_text(timeout=5000)
@@ -443,6 +444,22 @@ def assert_quality_feedback(page):
         raise AssertionError("Missing user-facing quality feedback.")
     if "Clear" in control:
         raise AssertionError("Quality feedback must not claim Clear accuracy.")
+
+
+def assert_no_waveform_block(page):
+    metrics = page.evaluate("""() => {
+      const waveformCount = document.querySelectorAll('.waveform, .progress-track').length;
+      const quality = document.querySelector('.quality-strip')?.getBoundingClientRect();
+      const subtitles = document.querySelector('.subtitle-scroll')?.getBoundingClientRect();
+      return {
+        waveformCount,
+        gap: quality && subtitles ? subtitles.top - quality.bottom : null,
+      };
+    }""")
+    if metrics["waveformCount"]:
+        raise AssertionError(f"Waveform/progress block should not render in subtitle workspace: {metrics}")
+    if metrics["gap"] is None or metrics["gap"] > 8:
+        raise AssertionError(f"Subtitle workspace is separated from quality strip by a large visual block: {metrics}")
 
 
 def wait_for_silent_live_feedback(page, timeout_ms):

@@ -250,7 +250,6 @@ export default function App() {
   const isRunning = useStore((state) => state.isRunning);
   const latencyMs = useStore((state) => state.latencyMs);
   const currentInterim = useStore((state) => state.currentInterim);
-  const waveformData = useStore((state) => state.waveformData);
   const sourceMode = useStore((state) => state.sourceMode);
   const demoScenarioId = useStore((state) => state.demoScenarioId);
   const asrApiKey = useStore((state) => state.asrApiKey);
@@ -307,7 +306,6 @@ export default function App() {
   const [termTarget, setTermTarget] = useState('');
   const [fileUrl, setFileUrl] = useState('');
   const [fileMeta, setFileMeta] = useState(null);
-  const [fileProgress, setFileProgress] = useState(0);
   const [fileStatus, setFileStatus] = useState('');
   const [fileStage, setFileStage] = useState('idle');
   const [isSampleLoading, setIsSampleLoading] = useState(false);
@@ -335,7 +333,6 @@ export default function App() {
   const hasLiveAsr = Boolean(asrApiKey.trim() || hasServerAsrKey);
   const effectiveChunkSeconds = Math.max(2, Number(chunkSeconds) || 3);
   const interimIsDiagnostic = isDiagnosticInterim(currentInterim);
-  const hasSignal = isRunning || isCapturing || currentInterim.en || hasSubtitles || fileProgress > 0;
   const nextAction = getNextAction({
     sourceMode,
     fileMeta,
@@ -685,7 +682,6 @@ export default function App() {
       size: file.size,
       duration: 0,
     });
-    setFileProgress(0);
     setFileStatus(status);
     setFileStage('ready');
     setSourceMode('file');
@@ -726,12 +722,6 @@ export default function App() {
     const duration = audioRef.current?.duration;
     if (!Number.isFinite(duration)) return;
     setFileMeta((current) => current ? { ...current, duration } : current);
-  };
-
-  const handleAudioTimeUpdate = () => {
-    const audio = audioRef.current;
-    if (!audio || !Number.isFinite(audio.duration) || audio.duration === 0) return;
-    setFileProgress(audio.currentTime / audio.duration);
   };
 
   const handleLiveCapture = async () => {
@@ -1126,7 +1116,6 @@ export default function App() {
                     controls
                     src={fileUrl}
                     onLoadedMetadata={handleAudioMetadata}
-                    onTimeUpdate={handleAudioTimeUpdate}
                   >
                     <track kind="captions" />
                   </video>
@@ -1137,7 +1126,6 @@ export default function App() {
                     controls
                     src={fileUrl}
                     onLoadedMetadata={handleAudioMetadata}
-                    onTimeUpdate={handleAudioTimeUpdate}
                   >
                     <track kind="captions" />
                   </audio>
@@ -1277,23 +1265,6 @@ export default function App() {
               <strong>{correctionMemory.length ? `${correctionMemory.length} confirmed` : 'No entries'}</strong>
             </div>
           </div>
-
-          {hasSignal && (
-            <>
-              <div className="waveform" aria-label="Audio waveform">
-                {Array.from({ length: 36 }).map((_, index) => (
-                  <span
-                    // eslint-disable-next-line react/no-array-index-key
-                    key={index}
-                    style={{ '--level': `${getWaveformLevel(waveformData, index)}%` }}
-                  />
-                ))}
-              </div>
-              <div className="progress-track">
-                <span style={{ width: sourceMode === 'file' ? `${Math.round(fileProgress * 100)}%` : undefined }} />
-              </div>
-            </>
-          )}
 
           <div className="subtitle-scroll" ref={subtitleScrollRef}>
             {displaySubtitles.length === 0 && !currentInterim.en && (
@@ -1759,12 +1730,6 @@ function getInterimDiagnosticLabel(interim) {
   if (/没有实际音量|未检测到实际音量|共享标签页音频/i.test(text)) return '音频输入提示';
   if (/ASR 暂未稳定|ASR 未稳定|合并下一语义窗/i.test(text)) return 'ASR 追赶中';
   return '状态提示';
-}
-
-function getWaveformLevel(waveformData, index) {
-  if (!waveformData.length) return 24 + ((index * 19) % 52);
-  const value = waveformData[index % waveformData.length] ?? 0;
-  return Math.max(8, Math.round((value / 255) * 70));
 }
 
 function SubtitleCard({ subtitle, analysis, isCurrent, isSelected, onSelect, showOriginal, showChinese }) {
