@@ -109,6 +109,12 @@ const UI_COPY = {
     latency: '延迟',
     context: '上下文',
     asr: 'ASR',
+    workflowListen: '听音接入',
+    workflowSegment: '语音切分',
+    workflowUnderstand: '语义理解',
+    workflowReformulate: '转译重组',
+    workflowOutput: '字幕输出',
+    workflowCorrect: '修正沉淀',
     ready: '待开始',
     readyBadge: '等待输入',
     readySource: 'Click Start Interpreting to play or capture English audio.',
@@ -161,6 +167,12 @@ const UI_COPY = {
     latency: 'Latency',
     context: 'Context',
     asr: 'ASR',
+    workflowListen: 'Listen',
+    workflowSegment: 'Segment',
+    workflowUnderstand: 'Understand',
+    workflowReformulate: 'Reformulate',
+    workflowOutput: 'Caption',
+    workflowCorrect: 'Correct',
     ready: 'Ready',
     readyBadge: 'Waiting',
     readySource: 'Click Start Interpreting to play or capture English audio.',
@@ -435,26 +447,26 @@ export default function App() {
       audioRef.current?.play().catch((error) => console.warn('[file] preview playback failed:', error));
       useStore.getState().startTranslation();
       setFileStage('asr');
-      setFileStatus('当前未配置 ASR Key，内置样本使用绑定英文转写文本继续演示 File 主线。');
+      setFileStatus('同传流程：听音接入完成，正在读取内置样本转写。');
       useStore.getState().updateCurrentInterim({
         en: SAMPLE_FILE.name,
         zh: '正在读取内置样本英文转写...',
       });
       await new Promise((resolve) => setTimeout(resolve, 450));
       setFileStage('translate');
-      setFileStatus('样本英文转写已就绪，正在生成中文字幕。');
+      setFileStatus('语音切分完成，正在按播放进度进行理解、转译和字幕输出。');
       await translateTranscriptTimed(SAMPLE_TRANSCRIPT, {
         audioElement: audioRef.current,
         totalDurationSec: audioRef.current?.duration || 8,
       });
       setFileStage('done');
-      setFileStatus('File 主线完成：样本音频 -> 英文转写 -> 中文字幕 -> 可修正与导出。');
+      setFileStatus('同传闭环完成：听音 -> 切分 -> 理解 -> 转译 -> 字幕 -> 修正导出。');
       useStore.getState().stopTranslation();
       return;
     }
 
     if (!asrApiKey.trim() && !hasServerAsr) {
-      setFileStatus('未填写浏览器 ASR Key，后端也未配置 ASR Key，普通文件已降级为演示转写流。');
+      setFileStatus('未配置 ASR Key，普通文件无法进入真实听音切分，已降级为演示转写流。');
       setFileStage('fallback');
       startFileDemoStream(audioRef.current);
       return;
@@ -465,11 +477,11 @@ export default function App() {
     useStore.getState().startTranslation();
     setFileStage('asr');
     setFileStatus(hasServerAsr && !asrApiKey.trim()
-      ? '正在通过本地后端代理调用真实 ASR...'
-      : '正在调用真实 ASR 转写文件音频...');
+      ? '听音接入中：正在通过本地后端代理调用真实 ASR...'
+      : '听音接入中：正在调用真实 ASR 转写文件音频...');
     useStore.getState().updateCurrentInterim({
       en: file.name,
-      zh: '正在上传音频并进行英文转写...',
+      zh: '正在听音并切分源语言音频...',
     });
 
     try {
@@ -480,13 +492,13 @@ export default function App() {
         model: asrModel,
       });
       setFileStage('translate');
-      setFileStatus('真实 ASR 转写完成，正在进入中文同传翻译。');
+      setFileStatus('语音切分完成，正在按播放进度进行语义理解、转译重组和字幕输出。');
       await translateTranscriptTimed(transcript, {
         audioElement: audio,
         totalDurationSec: audio?.duration || 0,
       });
       setFileStage('done');
-      setFileStatus('文件真实 ASR 与翻译流程完成。');
+      setFileStatus('同传闭环完成：听音 -> 切分 -> 理解 -> 转译 -> 字幕 -> 修正导出。');
     } catch (error) {
       console.warn('[file-asr] failed:', error);
       setFileStage('error');
@@ -607,7 +619,7 @@ export default function App() {
       const file = new File([blob], SAMPLE_FILE.name, {
         type: blob.type || SAMPLE_FILE.type,
       });
-      loadFile(file, '已加载内置英文样本。点击开始同传后，字幕会跟随音频进度逐句出现。');
+      loadFile(file, '已加载内置英文样本。点击开始同传后，系统会按“听音-切分-理解-转译-输出”的同传流程逐句出字幕。');
     } catch (error) {
       console.warn('[file-sample] failed:', error);
       setFileStage('error');
@@ -863,12 +875,7 @@ export default function App() {
                 {fileMeta && (
                   <StageRail
                     activeStage={fileStage}
-                    stages={[
-                      ['ready', 'File'],
-                      ['asr', 'ASR'],
-                      ['translate', 'Translate'],
-                      ['done', 'Done'],
-                    ]}
+                    stages={buildFileInterpretationStages(copy)}
                   />
                 )}
                 {fileStatus && <div className="file-status">{fileStatus}</div>}
@@ -892,7 +899,7 @@ export default function App() {
             )}
             {sourceMode === 'live' && (
               <div className="live-capture-card">
-                <LiveWorkflow stage={liveStage} hasSubtitles={hasSubtitles} />
+                <LiveWorkflow copy={copy} stage={liveStage} hasSubtitles={hasSubtitles} />
                 <button type="button" onClick={handleLiveCapture}>
                   {isCapturing ? copy.stopLive : copy.chooseLive}
                 </button>
@@ -1373,28 +1380,29 @@ function correctionLabel(type) {
   }[type] ?? '已修正';
 }
 
-function LiveWorkflow({ stage, hasSubtitles }) {
+function LiveWorkflow({ copy, stage, hasSubtitles }) {
   const activeIndex = {
     idle: 0,
     requesting: 0,
     captured: 1,
     'asr-ready': 2,
-    running: 2,
-    paused: hasSubtitles ? 4 : 1,
+    running: 3,
+    paused: hasSubtitles ? 5 : 1,
     error: 0,
   }[stage] ?? 0;
   const steps = [
-    '1 Select live source',
-    '2 Capture browser audio',
-    '3 Chunk ASR',
-    '4 Chinese captions',
-    '5 Correction & export',
+    `1 ${copy.workflowListen}`,
+    `2 ${copy.workflowSegment}`,
+    `3 ${copy.workflowUnderstand}`,
+    `4 ${copy.workflowReformulate}`,
+    `5 ${copy.workflowOutput}`,
+    `6 ${copy.workflowCorrect}`,
   ];
 
   return (
     <div className="live-workflow" aria-label="Live interpretation workflow">
       {steps.map((step, index) => (
-        <span className={index <= activeIndex || (index === 3 && hasSubtitles) || (index === 4 && hasSubtitles) ? 'done' : ''} key={step}>
+        <span className={index <= activeIndex || (hasSubtitles && index >= 4) ? 'done' : ''} key={step}>
           {step}
         </span>
       ))}
@@ -1448,8 +1456,8 @@ function SubtitleCard({ subtitle, analysis, isSelected, onSelect, showOriginal, 
 }
 
 function StageRail({ activeStage, stages }) {
-  const activeIndex = Math.max(0, stages.findIndex(([id]) => id === activeStage));
   const isError = activeStage === 'error';
+  const activeIndex = getFileWorkflowIndex(activeStage, stages.length);
 
   return (
     <div className={`stage-rail ${isError ? 'error' : ''}`} aria-label="File processing stages">
@@ -1460,6 +1468,32 @@ function StageRail({ activeStage, stages }) {
       ))}
     </div>
   );
+}
+
+function buildFileInterpretationStages(copy) {
+  return [
+    ['listen', copy.workflowListen],
+    ['segment', copy.workflowSegment],
+    ['understand', copy.workflowUnderstand],
+    ['reformulate', copy.workflowReformulate],
+    ['output', copy.workflowOutput],
+    ['correct', copy.workflowCorrect],
+  ];
+}
+
+function getFileWorkflowIndex(activeStage, stageCount) {
+  const maxIndex = Math.max(0, stageCount - 1);
+  const mapped = {
+    idle: 0,
+    ready: 0,
+    asr: 1,
+    fallback: 1,
+    translate: 3,
+    done: maxIndex,
+    error: 0,
+  }[activeStage];
+
+  return Math.min(maxIndex, Math.max(0, mapped ?? 0));
 }
 
 function getNextAction({
@@ -1474,11 +1508,11 @@ function getNextAction({
   isRunning,
 }) {
   if (isRunning) return '正在同传处理中，等待下一条稳定字幕后可修正或导出。';
-  if (sourceMode === 'file' && !fileMeta) return '点击 Use sample audio 加载内置英文样本，再开始文件同传主线。';
+  if (sourceMode === 'file' && !fileMeta) return '点击“加载样本”或上传音视频，再开始文件同传主线。';
   if (sourceMode === 'file' && !asrApiKey && !serverHasApiKey) return '填写 File ASR Key，或启动带 ASR Key 的后端；无 Key 时会明确降级为演示转写流。';
   if (!apiKey && !(provider === 'openai' && serverHasApiKey) && sourceMode !== 'demo') return '填写翻译 Provider Key，或启动带 DASHSCOPE_API_KEY 的后端并选择 Server Gateway。';
-  if (!hasSubtitles) return '点击 Start Interpreting，开始生成第一批双语字幕。';
-  if (correctionCount === 0) return '点击一条字幕，在 Correction Desk 里保存一次人工修正。';
+  if (!hasSubtitles) return '点击“开始同传”，系统会按听音、切分、理解、转译、输出的顺序逐句出字幕。';
+  if (correctionCount === 0) return '点击一条字幕，在修正区保存一次人工修正，让术语和表达沉淀下来。';
   return '当前闭环已跑通，可以导出 SRT 或继续添加术语重译。';
 }
 

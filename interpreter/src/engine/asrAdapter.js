@@ -107,7 +107,7 @@ async function translateSingleSentence(sentence, overrides = {}) {
   let translatedText = '';
   useStore.getState().updateCurrentInterim({
     en: sentence,
-    zh: '正在翻译真实转写文本...',
+    zh: '正在理解源语义并重组目标语言...',
   });
 
   try {

@@ -10,7 +10,7 @@
 
 PR-14：演示材料与提交文案完善。
 
-当前已建立 Vite + React 前端工程和 Node 后端代理，完成同传字幕工作台、Web Speech API STT、OpenAI-compatible 流式翻译、DashScope Qwen-ASR 后端代理、翻译修正闭环、稳定 Demo 模式、文件上传真实转写、直播标签页/屏幕音频捕获与 MediaRecorder 分片 ASR、直播字幕浮窗、高级设置、Web Audio 波形、浏览器 TTS、SRT / 双语文本导出。页面包含输入源选择、语言路由、Provider 配置、File/Live ASR 配置、演示场景/术语预设、时间轴字幕流、按需出现的修正编辑器、底部字幕预览和统计栏。
+当前已建立 Vite + React 前端工程和 Node 后端代理，完成同传字幕工作台、Web Speech API STT、OpenAI-compatible 流式翻译、DashScope Qwen-ASR 后端代理、翻译修正闭环、稳定 Demo 模式、文件上传真实转写、直播标签页/屏幕音频捕获与 MediaRecorder 分片 ASR、直播字幕浮窗、高级设置、Web Audio 波形、浏览器 TTS、SRT / 双语文本导出。页面按“听音接入、语音切分、语义理解、转译重组、字幕输出、修正沉淀”组织 File 和 Live 工作流，包含输入源选择、语言路由、Provider 配置、File/Live ASR 配置、演示场景/术语预设、时间轴字幕流、按需出现的修正编辑器、底部字幕预览和统计栏。
 
 Demo 视频：待录制，提交前替换为公开可访问链接。
 
@@ -116,7 +116,7 @@ Chrome 或 Edge 中打开本地页面，点击输入源 `麦克风`，再点击 
 2. 推荐启动已配置 `DASHSCOPE_API_KEY` 的本地后端代理；默认国产 ASR 模型为 `qwen3-asr-flash`。如需 OpenAI ASR，可把 `.env` 中 `ASR_PROVIDER` 改为 `openai`。
 3. 内置样本来自 `test-media/sample-english-speech.wav`，并复制到 `public/demo-media/` 供页面一键加载；左侧会显示文件名、大小、格式和时长。
 4. 点击 `开始同传` 后，系统会把文件发送到本地 `/api/transcribe`，再由 Gateway 转给 DashScope Qwen-ASR 或可选 OpenAI-compatible ASR。
-5. 转写结果会按句子进入目标语言翻译、字幕修正、术语命中、TTS 和导出流程。
+5. 转写结果不会一次性铺满页面，而是按音频播放进度进入“语义理解 -> 转译重组 -> 字幕输出”流程，逐句出现。
 6. 如果未填写浏览器 ASR Key 且后端没有配置 Key，内置样本会明确提示并使用绑定英文转写文本继续跑完 File 主线；普通文件会降级为演示转写流，不会伪装成真实 ASR。
 7. 如果翻译 Key 不可用，系统会使用标注的本地演示译文，确保字幕修正、术语命中、TTS 和导出仍可演示。
 8. 当前前端仍限制单次上传 25MB；更大文件可继续扩展后端分片上传。
