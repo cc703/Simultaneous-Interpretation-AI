@@ -30,6 +30,7 @@ import {
   stopSTTSession,
   transcribeAudioFile,
   translateTranscriptText,
+  translateTranscriptTimed,
   stopSystemAudioCapture,
   initTTS,
   cancelTTS,
@@ -442,7 +443,10 @@ export default function App() {
       await new Promise((resolve) => setTimeout(resolve, 450));
       setFileStage('translate');
       setFileStatus('样本英文转写已就绪，正在生成中文字幕。');
-      await translateTranscriptText(SAMPLE_TRANSCRIPT);
+      await translateTranscriptTimed(SAMPLE_TRANSCRIPT, {
+        audioElement: audioRef.current,
+        totalDurationSec: audioRef.current?.duration || 8,
+      });
       setFileStage('done');
       setFileStatus('File 主线完成：样本音频 -> 英文转写 -> 中文字幕 -> 可修正与导出。');
       useStore.getState().stopTranslation();
@@ -477,7 +481,10 @@ export default function App() {
       });
       setFileStage('translate');
       setFileStatus('真实 ASR 转写完成，正在进入中文同传翻译。');
-      await translateTranscriptText(transcript);
+      await translateTranscriptTimed(transcript, {
+        audioElement: audio,
+        totalDurationSec: audio?.duration || 0,
+      });
       setFileStage('done');
       setFileStatus('文件真实 ASR 与翻译流程完成。');
     } catch (error) {
@@ -550,6 +557,19 @@ export default function App() {
   const loadFile = (file, status = '') => {
     if (!file) return;
 
+    stopDemoStream();
+    stopAudioAnalyser();
+    cancelTTS();
+    useStore.getState().stopTranslation();
+    useStore.setState({
+      subtitles: [],
+      currentInterim: { en: '', zh: '' },
+      selectedSubtitleId: null,
+      totalSentences: 0,
+      totalChars: 0,
+      latencyMs: 0,
+    });
+    audioRef.current?.pause();
     if (fileUrl) URL.revokeObjectURL(fileUrl);
     const nextUrl = URL.createObjectURL(file);
     setUploadedFile(file);
@@ -564,6 +584,9 @@ export default function App() {
     setFileStatus(status);
     setFileStage('ready');
     setSourceMode('file');
+    if (audioRef.current) {
+      audioRef.current.currentTime = 0;
+    }
   };
 
   const handleFileChange = (event) => {
@@ -584,7 +607,7 @@ export default function App() {
       const file = new File([blob], SAMPLE_FILE.name, {
         type: blob.type || SAMPLE_FILE.type,
       });
-      loadFile(file, '已加载内置英文样本。点击 Start Interpreting 进入 ASR -> Translate -> Done。');
+      loadFile(file, '已加载内置英文样本。点击开始同传后，字幕会跟随音频进度逐句出现。');
     } catch (error) {
       console.warn('[file-sample] failed:', error);
       setFileStage('error');

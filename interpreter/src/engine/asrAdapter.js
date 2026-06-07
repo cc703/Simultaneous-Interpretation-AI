@@ -70,57 +70,86 @@ export async function transcribeAudioBlob({
 }
 
 export async function translateTranscriptText(text) {
-  const store = useStore.getState();
+  await translateTranscriptSentences(splitTranscript(text));
+}
+
+export async function translateTranscriptTimed(text, {
+  audioElement,
+  totalDurationSec = 0,
+  minGapMs = 900,
+} = {}) {
   const sentences = splitTranscript(text);
+  if (!sentences.length) return;
+  const timedSentences = buildTimedSentences(sentences, totalDurationSec);
 
-  for (const sentence of sentences) {
-    const startedAt = performance.now();
-    let translatedText = '';
-    useStore.getState().updateCurrentInterim({
-      en: sentence,
-      zh: '正在翻译真实转写文本...',
-    });
-
-    try {
-      for await (const token of streamTranslate({
-        text: sentence,
-        context: buildContext(useStore.getState().subtitles, store.contextWindow),
-        glossary: store.terminologyBoost ? buildGlossaryPrompt(useStore.getState().glossary) : '',
-        correctionMemory: useStore.getState().autoCorrect
-          ? buildCorrectionMemoryPrompt(
-            useStore.getState().correctionHistory,
-            useStore.getState().subtitles,
-          )
-          : '',
-        sourceLanguage: store.sourceLanguage,
-        targetLanguage: store.targetLanguage,
-        translationStyle: store.translationStyle,
-        provider: store.provider,
-        apiKey: store.apiKey,
-        baseUrl: store.baseUrl,
-        onToken: (tokenText) => {
-          translatedText += tokenText;
-          useStore.getState().updateCurrentInterim({ en: sentence, zh: translatedText });
-        },
-      })) {
-        void token;
-      }
-    } catch (error) {
-      console.warn('[file-asr] translation fallback:', error);
-      translatedText = buildDemoTranslation(sentence, useStore.getState().glossary);
+  for (const item of timedSentences) {
+    if (audioElement) {
+      await waitForAudioTime(audioElement, item.releaseAtSec);
+    } else {
+      await delay(minGapMs);
     }
-
-    useStore.getState().appendSubtitle({
+    await translateSingleSentence(item.text, {
       timestamp: Date.now(),
-      en: sentence,
-      zh: translatedText,
-      corrected: false,
-      correctionType: null,
-      termsApplied: findTerms(sentence, useStore.getState().glossary),
+      timeLabel: formatTimeLabel(item.releaseAtSec),
     });
-    if (useStore.getState().voiceOutput) enqueueTTS(translatedText);
-    useStore.setState({ latencyMs: Math.round(performance.now() - startedAt) });
   }
+}
+
+async function translateTranscriptSentences(sentences) {
+  for (const sentence of sentences) {
+    await translateSingleSentence(sentence);
+  }
+}
+
+async function translateSingleSentence(sentence, overrides = {}) {
+  const store = useStore.getState();
+  const startedAt = performance.now();
+  let translatedText = '';
+  useStore.getState().updateCurrentInterim({
+    en: sentence,
+    zh: '正在翻译真实转写文本...',
+  });
+
+  try {
+    for await (const token of streamTranslate({
+      text: sentence,
+      context: buildContext(useStore.getState().subtitles, store.contextWindow),
+      glossary: store.terminologyBoost ? buildGlossaryPrompt(useStore.getState().glossary) : '',
+      correctionMemory: useStore.getState().autoCorrect
+        ? buildCorrectionMemoryPrompt(
+          useStore.getState().correctionHistory,
+          useStore.getState().subtitles,
+        )
+        : '',
+      sourceLanguage: store.sourceLanguage,
+      targetLanguage: store.targetLanguage,
+      translationStyle: store.translationStyle,
+      provider: store.provider,
+      apiKey: store.apiKey,
+      baseUrl: store.baseUrl,
+      onToken: (tokenText) => {
+        translatedText += tokenText;
+        useStore.getState().updateCurrentInterim({ en: sentence, zh: translatedText });
+      },
+    })) {
+      void token;
+    }
+  } catch (error) {
+    console.warn('[file-asr] translation fallback:', error);
+    translatedText = buildDemoTranslation(sentence, useStore.getState().glossary);
+  }
+
+  useStore.getState().appendSubtitle({
+    timestamp: overrides.timestamp ?? Date.now(),
+    timeLabel: overrides.timeLabel,
+    en: sentence,
+    zh: translatedText,
+    corrected: false,
+    correctionType: null,
+    termsApplied: findTerms(sentence, useStore.getState().glossary),
+  });
+  if (useStore.getState().voiceOutput) enqueueTTS(translatedText);
+  useStore.setState({ latencyMs: Math.round(performance.now() - startedAt) });
 }
 
 export function buildDemoTranslation(sentence, glossary = []) {
@@ -149,6 +178,64 @@ function findTerms(sentence, glossary) {
   return glossary
     .filter((term) => term.enabled && lower.includes(term.source.toLowerCase()))
     .map((term) => term.source);
+}
+
+function buildTimedSentences(sentences, totalDurationSec) {
+  const safeDuration = Number.isFinite(totalDurationSec) && totalDurationSec > 0
+    ? totalDurationSec
+    : sentences.length * 1.8;
+  const totalWeight = sentences.reduce((sum, sentence) => sum + sentence.length, 0) || sentences.length;
+  let cursor = 0;
+
+  return sentences.map((sentence, index) => {
+    const releaseAtSec = index === 0 ? 0.4 : cursor;
+    cursor += Math.max(0.9, (sentence.length / totalWeight) * safeDuration);
+    return {
+      text: sentence,
+      releaseAtSec: Math.min(Math.max(0.4, releaseAtSec), Math.max(0.4, safeDuration - 0.3)),
+    };
+  });
+}
+
+function waitForAudioTime(audioElement, targetSec) {
+  if (!audioElement || audioElement.ended) return Promise.resolve();
+  if (audioElement.currentTime >= targetSec) return Promise.resolve();
+
+  return new Promise((resolve) => {
+    const cleanup = () => {
+      audioElement.removeEventListener('timeupdate', handleTimeUpdate);
+      audioElement.removeEventListener('ended', cleanup);
+      audioElement.removeEventListener('pause', handlePause);
+    };
+    const handleTimeUpdate = () => {
+      if (audioElement.currentTime >= targetSec || audioElement.ended) {
+        cleanup();
+        resolve();
+      }
+    };
+    const handlePause = () => {
+      if (audioElement.ended) {
+        cleanup();
+        resolve();
+      }
+    };
+    audioElement.addEventListener('timeupdate', handleTimeUpdate);
+    audioElement.addEventListener('ended', cleanup, { once: true });
+    audioElement.addEventListener('pause', handlePause);
+    handleTimeUpdate();
+  });
+}
+
+function delay(ms) {
+  return new Promise((resolve) => setTimeout(resolve, ms));
+}
+
+function formatTimeLabel(seconds) {
+  const safe = Math.max(0, Math.floor(seconds));
+  const hours = String(Math.floor(safe / 3600)).padStart(2, '0');
+  const minutes = String(Math.floor((safe % 3600) / 60)).padStart(2, '0');
+  const rest = String(safe % 60).padStart(2, '0');
+  return `${hours}:${minutes}:${rest}`;
 }
 
 const DEMO_TRANSLATION_PATTERNS = [
