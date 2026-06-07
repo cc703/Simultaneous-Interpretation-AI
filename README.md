@@ -15,7 +15,7 @@
 - 最终演示路径：[interpreter/docs/final-demo-path.md](interpreter/docs/final-demo-path.md)
 - 录屏讲解脚本：[interpreter/docs/demo-script.md](interpreter/docs/demo-script.md)
 - 最终验收记录：[interpreter/docs/final-closure-smoke.md](interpreter/docs/final-closure-smoke.md)
-- Demo 视频：待替换为公开可访问链接
+- Demo 视频：[简介_哔哩哔哩_bilibili](https://www.bilibili.com/video/BV18LEt6rE3m/?vd_source=e2b3697c034027b5595984d89d11dfac)
 
 建议评审演示顺序：
 
@@ -44,6 +44,25 @@
 ## 快速启动
 
 推荐使用两个终端。
+
+Windows / PowerShell 直接运行：
+
+```powershell
+cd D:\桌面\AI同声\interpreter
+npm.cmd install
+npm.cmd run dev:server
+```
+
+另开一个 PowerShell：
+
+```powershell
+cd D:\桌面\AI同声\interpreter
+npm.cmd run dev -- --host 127.0.0.1
+```
+
+然后打开 `http://127.0.0.1:5173`。Gateway 健康检查地址是 `http://127.0.0.1:8787/api/health`。
+
+跨平台通用方式：
 
 终端 A：启动本地 Gateway。
 
@@ -110,6 +129,7 @@ npm run check:api
 ├── README.md                  # GitHub 首页说明
 ├── design.md                  # 产品目标与设计文档
 ├── AGENT.md                   # 开发协作与提交规范
+├── 简介.mp4                   # Demo 讲解视频
 └── interpreter/
     ├── src/                   # React 同传工作台
     ├── server/                # Node AI Gateway 与 ASR/翻译代理
