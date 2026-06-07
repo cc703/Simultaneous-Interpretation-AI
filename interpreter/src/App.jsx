@@ -19,7 +19,6 @@ import {
   isSTTSupported,
   startDemoStream,
   startElementAnalyser,
-  startFileDemoStream,
   startStreamAnalyser,
   startSTTSession,
   startSystemAudioCapture,
@@ -202,9 +201,6 @@ export default function App() {
   const waveformData = useStore((state) => state.waveformData);
   const sourceMode = useStore((state) => state.sourceMode);
   const demoScenarioId = useStore((state) => state.demoScenarioId);
-  const provider = useStore((state) => state.provider);
-  const apiKey = useStore((state) => state.apiKey);
-  const baseUrl = useStore((state) => state.baseUrl);
   const asrApiKey = useStore((state) => state.asrApiKey);
   const asrBaseUrl = useStore((state) => state.asrBaseUrl);
   const asrModel = useStore((state) => state.asrModel);
@@ -231,9 +227,6 @@ export default function App() {
   const selectedSubtitleId = useStore((state) => state.selectedSubtitleId);
   const setSourceMode = useStore((state) => state.setSourceMode);
   const setDemoScenarioId = useStore((state) => state.setDemoScenarioId);
-  const setProvider = useStore((state) => state.setProvider);
-  const setApiKey = useStore((state) => state.setApiKey);
-  const setBaseUrl = useStore((state) => state.setBaseUrl);
   const setAsrApiKey = useStore((state) => state.setAsrApiKey);
   const setAsrBaseUrl = useStore((state) => state.setAsrBaseUrl);
   const setAsrModel = useStore((state) => state.setAsrModel);
@@ -281,6 +274,7 @@ export default function App() {
   const hasSubtitles = displaySubtitles.length > 0;
   const activeDemoScenario = getDemoScenario(demoScenarioId);
   const hasServerAsrKey = Boolean(serverHealth.ok && (serverHealth.hasAsrKey ?? serverHealth.hasOpenAIKey));
+  const hasServerTranslationKey = Boolean(serverHealth.ok && (serverHealth.hasTranslationKey ?? serverHealth.hasOpenAIKey));
   const hasLiveAsr = Boolean(asrApiKey.trim() || hasServerAsrKey);
   const hasSignal = isRunning || isCapturing || currentInterim.en || hasSubtitles || fileProgress > 0;
   const showSubtitlePreview = showBanner && (isRunning || currentInterim.en || hasSubtitles);
@@ -288,9 +282,8 @@ export default function App() {
     sourceMode,
     fileMeta,
     asrApiKey,
-    apiKey,
     serverHasApiKey: hasServerAsrKey,
-    provider,
+    serverHasTranslationKey: hasServerTranslationKey,
     hasSubtitles,
     correctionCount,
     isRunning,
@@ -466,9 +459,8 @@ export default function App() {
     }
 
     if (!asrApiKey.trim() && !hasServerAsr) {
-      setFileStatus('未配置 ASR Key，普通文件无法进入真实听音切分，已降级为演示转写流。');
-      setFileStage('fallback');
-      startFileDemoStream(audioRef.current);
+      setFileStatus('未配置 ASR Key，普通上传文件无法真实转写。请填写 ASR API Key，或启动带 DASHSCOPE_API_KEY / OPENAI_API_KEY 的后端。');
+      setFileStage('error');
       return;
     }
 
@@ -1099,7 +1091,7 @@ export default function App() {
             <span>{copy.translated} {displaySubtitles.length}</span>
             <span>{copy.corrections} {correctionCount}</span>
             <span>{copy.glossary} {glossary.length}</span>
-            <span>{copy.provider} {provider}</span>
+            <span>{copy.provider} {serverHealth.translationModel ?? 'gateway'}</span>
           </footer>
         </section>
       </main>
@@ -1144,38 +1136,11 @@ export default function App() {
             {configTab === 'translate' && (
               <div className="config-body">
                 <div className="field-line compact">
-                  <span>{provider}</span>
-                  <code>{apiKey ? 'browser key' : provider === 'openai' && serverHealth.hasOpenAIKey ? 'server key' : 'key needed'}</code>
+                  <span>{serverHealth.translationModel ?? 'qwen-plus'}</span>
+                  <code>{hasServerTranslationKey ? 'server key' : 'key needed'}</code>
                 </div>
-                <select
-                  className="settings-control"
-                  aria-label="Provider"
-                  value={provider}
-                  onChange={(event) => setProvider(event.target.value)}
-                >
-                  <option value="deepseek">DeepSeek</option>
-                  <option value="openai">Server Gateway</option>
-                  <option value="custom">Custom</option>
-                </select>
-                {provider === 'custom' && (
-                  <input
-                    className="settings-control"
-                    aria-label="Custom base URL"
-                    placeholder="https://api.example.com/v1"
-                    value={baseUrl}
-                    onChange={(event) => setBaseUrl(event.target.value)}
-                  />
-                )}
-                <input
-                  className="settings-control"
-                  aria-label="API key"
-                  placeholder="Translation API key (memory only)"
-                  type="password"
-                  value={apiKey}
-                  onChange={(event) => setApiKey(event.target.value)}
-                />
                 <div className="secret-input">
-                  Browser key stays in memory. Server Gateway uses keys from .env.
+                  翻译统一走本地后端 /api/translate；后端默认使用 DashScope 兼容网关和 .env 中的 DASHSCOPE_API_KEY。
                 </div>
               </div>
             )}
@@ -1500,9 +1465,8 @@ function getNextAction({
   sourceMode,
   fileMeta,
   asrApiKey,
-  apiKey,
   serverHasApiKey,
-  provider,
+  serverHasTranslationKey,
   hasSubtitles,
   correctionCount,
   isRunning,
@@ -1510,7 +1474,7 @@ function getNextAction({
   if (isRunning) return '正在同传处理中，等待下一条稳定字幕后可修正或导出。';
   if (sourceMode === 'file' && !fileMeta) return '点击“加载样本”或上传音视频，再开始文件同传主线。';
   if (sourceMode === 'file' && !asrApiKey && !serverHasApiKey) return '填写 File ASR Key，或启动带 ASR Key 的后端；无 Key 时会明确降级为演示转写流。';
-  if (!apiKey && !(provider === 'openai' && serverHasApiKey) && sourceMode !== 'demo') return '填写翻译 Provider Key，或启动带 DASHSCOPE_API_KEY 的后端并选择 Server Gateway。';
+  if (!serverHasTranslationKey && sourceMode !== 'demo') return '启动带 DASHSCOPE_API_KEY 的后端，翻译会统一走本地 /api/translate 网关。';
   if (!hasSubtitles) return '点击“开始同传”，系统会按听音、切分、理解、转译、输出的顺序逐句出字幕。';
   if (correctionCount === 0) return '点击一条字幕，在修正区保存一次人工修正，让术语和表达沉淀下来。';
   return '当前闭环已跑通，可以导出 SRT 或继续添加术语重译。';

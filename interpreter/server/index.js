@@ -89,6 +89,7 @@ async function proxyTranslation(request, response) {
     return;
   }
   let upstream;
+  const shouldStream = payload.stream !== false;
   try {
     upstream = await fetch(`${OPENAI_TRANSLATION_BASE_URL.replace(/\/$/, '')}/chat/completions`, {
       method: 'POST',
@@ -98,7 +99,7 @@ async function proxyTranslation(request, response) {
       },
       body: JSON.stringify({
         model: payload.model || OPENAI_TRANSLATION_MODEL,
-        stream: true,
+        stream: shouldStream,
         temperature: 0.2,
         messages: payload.messages,
       }),
@@ -127,15 +128,22 @@ async function proxyTranslation(request, response) {
     return;
   }
 
+  if (!shouldStream) {
+    const text = await upstream.text();
+    response.writeHead(200, {
+      'Content-Type': upstream.headers.get('content-type') ?? 'application/json; charset=utf-8',
+    });
+    response.end(text);
+    return;
+  }
+
   response.writeHead(200, {
     'Content-Type': 'text/event-stream; charset=utf-8',
     'Cache-Control': 'no-cache',
     Connection: 'keep-alive',
   });
 
-  for await (const chunk of upstream.body) {
-    response.write(chunk);
-  }
+  for await (const chunk of upstream.body) response.write(chunk);
   response.end();
 }
 

@@ -4,6 +4,7 @@ import {
   buildCorrectionMemoryPrompt,
   buildGlossaryPrompt,
   streamTranslate,
+  translateBatch,
 } from './translator.js';
 import { enqueueTTS } from './tts.js';
 
@@ -76,22 +77,35 @@ export async function translateTranscriptText(text) {
 export async function translateTranscriptTimed(text, {
   audioElement,
   totalDurationSec = 0,
-  minGapMs = 900,
+  minGapMs = 450,
 } = {}) {
   const sentences = splitTranscript(text);
   if (!sentences.length) return;
   const timedSentences = buildTimedSentences(sentences, totalDurationSec);
+  const batchTranslations = await translateSentencesBatch(sentences).catch((error) => {
+    console.warn('[file-asr] batch translation unavailable:', error);
+    return null;
+  });
 
-  for (const item of timedSentences) {
+  for (let index = 0; index < timedSentences.length; index += 1) {
+    const item = timedSentences[index];
     if (audioElement) {
       await waitForAudioTime(audioElement, item.releaseAtSec);
     } else {
       await delay(minGapMs);
     }
-    await translateSingleSentence(item.text, {
-      timestamp: Date.now(),
-      timeLabel: formatTimeLabel(item.releaseAtSec),
-    });
+    if (batchTranslations?.[index]) {
+      appendTranslatedSentence(item.text, batchTranslations[index], {
+        startedAt: performance.now(),
+        timestamp: Date.now(),
+        timeLabel: formatTimeLabel(item.releaseAtSec),
+      });
+    } else {
+      await translateSingleSentence(item.text, {
+        timestamp: Date.now(),
+        timeLabel: formatTimeLabel(item.releaseAtSec),
+      });
+    }
   }
 }
 
@@ -99,6 +113,31 @@ async function translateTranscriptSentences(sentences) {
   for (const sentence of sentences) {
     await translateSingleSentence(sentence);
   }
+}
+
+async function translateSentencesBatch(sentences) {
+  const store = useStore.getState();
+  useStore.getState().updateCurrentInterim({
+    en: sentences[0],
+    zh: '正在结合上下文批量转译同传意群...',
+  });
+  return translateBatch({
+    texts: sentences,
+    context: buildContext(useStore.getState().subtitles, store.contextWindow),
+    glossary: store.terminologyBoost ? buildGlossaryPrompt(useStore.getState().glossary) : '',
+    correctionMemory: useStore.getState().autoCorrect
+      ? buildCorrectionMemoryPrompt(
+        useStore.getState().correctionHistory,
+        useStore.getState().subtitles,
+      )
+      : '',
+    sourceLanguage: store.sourceLanguage,
+    targetLanguage: store.targetLanguage,
+    translationStyle: store.translationStyle,
+    provider: store.provider,
+    apiKey: store.apiKey,
+    baseUrl: store.baseUrl,
+  });
 }
 
 async function translateSingleSentence(sentence, overrides = {}) {
@@ -136,12 +175,24 @@ async function translateSingleSentence(sentence, overrides = {}) {
     }
   } catch (error) {
     console.warn('[file-asr] translation fallback:', error);
-    translatedText = buildDemoTranslation(sentence, useStore.getState().glossary);
+    translatedText = buildTransparentFallback(sentence, useStore.getState().glossary);
   }
 
-  useStore.getState().appendSubtitle({
+  appendTranslatedSentence(sentence, translatedText, {
+    startedAt,
     timestamp: overrides.timestamp ?? Date.now(),
     timeLabel: overrides.timeLabel,
+  });
+}
+
+function appendTranslatedSentence(sentence, translatedText, {
+  startedAt,
+  timestamp = Date.now(),
+  timeLabel,
+} = {}) {
+  useStore.getState().appendSubtitle({
+    timestamp,
+    timeLabel,
     en: sentence,
     zh: translatedText,
     corrected: false,
@@ -149,7 +200,7 @@ async function translateSingleSentence(sentence, overrides = {}) {
     termsApplied: findTerms(sentence, useStore.getState().glossary),
   });
   if (useStore.getState().voiceOutput) enqueueTTS(translatedText);
-  useStore.setState({ latencyMs: Math.round(performance.now() - startedAt) });
+  if (startedAt) useStore.setState({ latencyMs: Math.round(performance.now() - startedAt) });
 }
 
 export function buildDemoTranslation(sentence, glossary = []) {
@@ -160,17 +211,70 @@ export function buildDemoTranslation(sentence, glossary = []) {
     .map((term) => `${term.source} -> ${term.target}`);
 
   const dictionaryHit = DEMO_TRANSLATION_PATTERNS.find(([pattern]) => lower.includes(pattern));
-  const translated = dictionaryHit?.[1] ?? `演示译文：${normalized}`;
+  const translated = dictionaryHit?.[1] ?? buildTransparentFallback(normalized);
   const termNote = termHits.length > 0 ? `（术语：${termHits.join('；')}）` : '';
   return `${translated}${termNote}`;
 }
 
+function buildTransparentFallback(sentence, glossary = []) {
+  const clipped = sentence.length > 120 ? `${sentence.slice(0, 117)}...` : sentence;
+  const lower = sentence.toLowerCase();
+  const termHits = glossary
+    .filter((term) => term.enabled && lower.includes(term.source.toLowerCase()))
+    .map((term) => `${term.source} -> ${term.target}`);
+  const termNote = termHits.length > 0 ? `（术语：${termHits.join('；')}）` : '';
+  return `翻译服务暂不可用，保留源文：${clipped}${termNote}`;
+}
+
 export function splitTranscript(text) {
-  return text
+  const sentences = text
     .replace(/\s+/g, ' ')
     .split(/(?<=[.!?])\s+/)
     .map((sentence) => sentence.trim())
     .filter(Boolean);
+
+  return sentences.flatMap((sentence) => splitLongSentence(sentence));
+}
+
+function splitLongSentence(sentence) {
+  const normalized = sentence.replace(/\s+/g, ' ').trim();
+  if (normalized.length <= 96) return [normalized];
+
+  const phrases = normalized
+    .split(/(?<=[,;:])\s+|\s+(?=(?:and|or|but|because|while|whether|if|so|then|today|at the end|in this recording|exploring)\b)/i)
+    .map((part) => part.trim())
+    .filter(Boolean);
+  const chunks = [];
+  let current = '';
+
+  for (const phrase of phrases) {
+    const next = current ? `${current} ${phrase}` : phrase;
+    if (next.length > 86 && current) {
+      chunks.push(current);
+      current = phrase;
+    } else {
+      current = next;
+    }
+  }
+  if (current) chunks.push(current);
+
+  return chunks.flatMap((chunk) => {
+    if (chunk.length <= 110) return [chunk];
+    const words = chunk.split(' ');
+    const wordChunks = [];
+    let cursor = '';
+    for (const word of words) {
+      const next = cursor ? `${cursor} ${word}` : word;
+      if (next.length > 86 && cursor) {
+        wordChunks.push(cursor);
+        cursor = word;
+      } else {
+        cursor = next;
+      }
+    }
+    if (cursor) wordChunks.push(cursor);
+    return wordChunks;
+  });
 }
 
 function findTerms(sentence, glossary) {
@@ -182,17 +286,17 @@ function findTerms(sentence, glossary) {
 
 function buildTimedSentences(sentences, totalDurationSec) {
   const safeDuration = Number.isFinite(totalDurationSec) && totalDurationSec > 0
-    ? totalDurationSec
-    : sentences.length * 1.8;
+    ? Math.min(totalDurationSec, sentences.length * 1.8)
+    : sentences.length * 0.8;
   const totalWeight = sentences.reduce((sum, sentence) => sum + sentence.length, 0) || sentences.length;
   let cursor = 0;
 
   return sentences.map((sentence, index) => {
-    const releaseAtSec = index === 0 ? 0.4 : cursor;
-    cursor += Math.max(0.9, (sentence.length / totalWeight) * safeDuration);
+    const releaseAtSec = index === 0 ? 0.15 : cursor;
+    cursor += Math.max(0.45, (sentence.length / totalWeight) * safeDuration);
     return {
       text: sentence,
-      releaseAtSec: Math.min(Math.max(0.4, releaseAtSec), Math.max(0.4, safeDuration - 0.3)),
+      releaseAtSec: Math.min(Math.max(0.15, releaseAtSec), Math.max(0.15, safeDuration - 0.2)),
     };
   });
 }
