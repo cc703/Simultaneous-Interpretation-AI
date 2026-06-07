@@ -1,81 +1,87 @@
 # Simultaneous-Interpretation-AI
 
-题目二作品：AI 同声传译助手。
+![AI 同声传译助手视觉封面](interpreter/public/og-cover.svg)
 
-本项目面向 72 小时 AI 应用开发评审，目标是完成一个能将外语音频流实时翻译成目标语言的助手，并支持字幕输出、语音播报、人工翻译修正、修正记忆沉淀和最终导出。
+题目二作品：**AI 同声传译助手**。
 
-核心演示闭环：
+本项目面向英语演讲、技术分享、国际会议、网课、网页直播和线上会议等单向音频流场景，提供从听音接入、语音切分、语义理解、目标语重组到字幕输出、语音播报、人工修正和最终导出的完整同传工作台。默认目标语言为中文，也支持繁体中文、英文、日文、韩文、法文和西班牙文等目标语言切换。
 
-```text
-英文音频 / 英文视频 / 直播音频
-        -> 听音接入 / 语音切分
-        -> 语义理解 / 目标语重组
-        -> 同传字幕输出
-        -> 人工修正与术语重译
-        -> 修正记忆沉淀
-        -> SRT / 双语文本导出
-```
+核心目标不是离线翻译一个文件，而是在音频持续输入时，以低延迟字幕或语音形式输出可跟随的目标语言内容，并允许用户在同传过程中修正译文、沉淀术语和复用修正记忆。
 
-## 当前状态
+## 演示入口
 
-已完成一个可运行的同传工作台，包含：
+- 应用目录：[interpreter](interpreter/)
+- 工程说明：[interpreter/README.md](interpreter/README.md)
+- 最终演示路径：[interpreter/docs/final-demo-path.md](interpreter/docs/final-demo-path.md)
+- 录屏讲解脚本：[interpreter/docs/demo-script.md](interpreter/docs/demo-script.md)
+- 最终验收记录：[interpreter/docs/final-closure-smoke.md](interpreter/docs/final-closure-smoke.md)
+- Demo 视频：待替换为公开可访问链接
 
-- Demo 模式：无 API Key 也能稳定展示完整同传闭环。
-- File 模式：一键加载内置英文样本或上传音频/视频后，经 ASR 或明确标注的样本转写文本进入目标语言翻译链路。
-- Live 模式：捕获网页直播、社交平台直播、媒体直播或线上会议的标签页/屏幕音频，默认按 1 秒低延迟分片做转写和翻译；无 ASR Key 时只展示捕获与配置缺口，不生成假字幕。
-- 直播字幕浮窗：可打开独立字幕浮窗，Chromium 支持时以 Document Picture-in-Picture 形式覆盖在直播/会议页面上方，避免用户来回切回工作台。
-- 同传流程化工作台：按“听音接入、语音切分、语义理解、转译重组、字幕输出、修正沉淀”组织 File 和 Live 状态。
-- 翻译修正：点击字幕后可修改目标语言译文，并记录到修正记忆。
-- 术语表：支持专业词条添加、术语命中和术语重译。
-- 质量诊断：提示疑似漏译、术语未命中、占位翻译等风险。
-- 语言路由：源语言默认自动检测，也可手动选择；目标语言可选中文、英文、日文、韩文等。
-- 输出能力：支持字幕、浏览器 TTS、SRT 和双语文本导出。
+建议评审演示顺序：
 
-Demo 视频：待录制，提交前会替换为公开可访问链接。
+1. 用 Demo 模式展示无 Key 兜底闭环。
+2. 用 File 内置样本展示真实 ASR、媒体同步和逐句字幕释放。
+3. 切换目标语言和字幕视图，展示语言路由。
+4. 点击字幕保存人工修正，展示修正记忆。
+5. 添加术语并执行术语重译。
+6. 切到 Live 模式，选择标签页或屏幕音频，打开字幕浮窗。
+7. 导出 SRT 或复制双语文本。
+
+## 已实现能力
+
+- **Demo 模式**：不配置 API Key 也能稳定演示“英文音频流 -> 中文字幕 -> 人工修正 -> 术语重译 -> TTS -> SRT 导出”的完整闭环。
+- **File 模式**：支持上传音频/视频文件，或一键加载内置英文样本；真实 ASR 完成后按媒体播放进度逐句释放字幕，避免音频未结束字幕先跑完。
+- **Live 模式**：通过浏览器 `getDisplayMedia` 捕获共享标签页或屏幕音频，按低延迟语义窗送入 ASR，再持续输出目标语言字幕。
+- **Mic 模式**：在支持 Web Speech API 的浏览器中，可用麦克风 final 识别结果进入翻译管线。
+- **字幕浮窗**：支持 Document Picture-in-Picture；浏览器不支持时降级为普通弹窗，便于覆盖在直播或会议页面上方。
+- **真实 ASR / 翻译 Gateway**：本地 Node Gateway 隔离 Key，统一适配 DashScope 和 OpenAI-compatible API。
+- **媒体兼容**：常见音频、视频音轨、WebM/Opus Live 分片会在 Gateway 侧转成 ASR 更稳定的 16kHz mono WAV。
+- **快语速和静音处理**：区分快语速、ASR 不稳定、无实际音量和无可转写语音，不把诊断状态当成正式字幕。
+- **人工修正闭环**：保存后的用户译文会进入修正记忆，并保护人工确认译文不被自动回修覆盖。
+- **术语表**：支持添加专业词条、术语命中提示和术语重译。
+- **输出能力**：支持双语/目标语言/源语言视图、浏览器 TTS、SRT 下载和双语文本复制。
 
 ## 快速启动
 
-前端工作台：
+推荐使用两个终端。
 
-```bash
-cd interpreter
-npm install
-npm run dev
-```
-
-打开：
-
-```text
-http://localhost:5173
-```
-
-真实 ASR / 翻译建议同时启动本地后端代理：
+终端 A：启动本地 Gateway。
 
 ```bash
 cd interpreter
 copy .env.example .env
+# 在 .env 中填写 DASHSCOPE_API_KEY
+npm install
 npm run dev:server
 ```
 
-然后另开一个终端：
+终端 B：启动前端工作台。
 
 ```bash
 cd interpreter
-npm run dev
+npm run dev -- --host 127.0.0.1
 ```
 
-Vite 会把 `/api/*` 请求转发到本地后端 `http://localhost:8787`。
+默认地址：
+
+- 前端：`http://127.0.0.1:5173`
+- Gateway：`http://127.0.0.1:8787`
+- 健康检查：`http://127.0.0.1:8787/api/health`
+
+如果只想无 Key 体验产品闭环，可以直接启动前端并使用 Demo 模式。真实 File / Live ASR 需要配置 Provider Key。
 
 ## API 配置
 
-项目支持把翻译和语音识别分开配置。默认优先使用阿里云百炼 DashScope：`qwen-plus` 负责中文翻译，`qwen3-asr-flash` 负责英文 ASR，也保留 OpenAI-compatible 自定义入口。
+项目默认使用阿里云百炼 DashScope：
 
-后端不是业务后台，而是轻量 AI Gateway：负责 Key 隔离、ASR Provider 适配、翻译 Provider 适配和统一错误边界。前端继续负责输入源、字幕、修正、术语和导出。详见 [轻量 AI Gateway 设计](interpreter/docs/backend-gateway.md)。
+- `qwen-plus`：目标语言翻译。
+- `qwen3-asr-flash`：英文 ASR。
+- OpenAI-compatible 入口：保留给 OpenAI 或其他兼容网关。
 
-`.env` 示例：
+最小 `.env` 配置：
 
 ```env
-DASHSCOPE_API_KEY=你的阿里云百炼DashScope Key
+DASHSCOPE_API_KEY=你的阿里云百炼 DashScope Key
 DASHSCOPE_BASE_URL=https://dashscope.aliyuncs.com/compatible-mode/v1
 DASHSCOPE_TRANSLATION_MODEL=qwen-plus
 ASR_PROVIDER=dashscope
@@ -83,8 +89,12 @@ DASHSCOPE_ASR_BASE_URL=https://dashscope.aliyuncs.com/compatible-mode/v1
 DASHSCOPE_ASR_MODEL=qwen3-asr-flash
 ```
 
-也就是说，如果你使用百炼免费额度，通常只需要复制 `.env.example` 为 `.env`，然后填写 `DASHSCOPE_API_KEY`。
-前端默认 Provider 为 `Server Gateway`，会通过本地 `/api/translate` 使用 `.env` 中的百炼 Key。
+说明：
+
+- 前端默认 Provider 为 `Server Gateway`，启动后端后不需要在浏览器输入真实 Key。
+- `.env` 只在本地 Gateway 读取，真实 Key 不提交到仓库。
+- 浏览器设置面板里的 API Key 只保存在当前页面内存，不写入 localStorage。
+- Provider、Base URL、目标语言、风格、上下文窗口、分片长度、TTS 语速等非密钥设置会保存到 localStorage。
 
 检查当前接口配置：
 
@@ -92,48 +102,6 @@ DASHSCOPE_ASR_MODEL=qwen3-asr-flash
 cd interpreter
 npm run check:api
 ```
-
-## 最终演示路径
-
-建议评审演示按这个顺序进行：
-
-1. 先跑 File 模式，点击 `加载样本` 或上传音视频，展示 `上传 -> ASR -> 翻译 -> 字幕` 主线。
-2. 展示语言路由：源语言默认自动检测，目标语言可切换；字幕显示为 `双语 / 目标语言 / 检测语言`。
-3. 点击一条字幕，在翻译修正区修改译文并保存。
-4. 添加或确认术语，展示术语重译和修正记忆。
-5. 切到 Live 模式，展示标签页/屏幕音频捕获、字幕浮窗、分片统计、静音跳过和重复转写去重。
-6. 点击 Export / Copy，展示 SRT 和双语文本导出。Demo 模式作为无 Key 兜底演示。
-
-详细脚本见：
-
-- [最终演示路径](interpreter/docs/final-demo-path.md)
-- [录屏讲解脚本](interpreter/docs/demo-script.md)
-- [文件 ASR 烟测说明](interpreter/docs/file-asr-smoke.md)
-- [轻量 AI Gateway 设计](interpreter/docs/backend-gateway.md)
-- [阿里云百炼 DashScope API 配置](interpreter/docs/dashscope-bailian-setup.md)
-
-## 验证命令
-
-```bash
-cd interpreter
-npm test
-npm run build
-npm run check:api
-npm run smoke:file-asr
-npm run smoke:media
-npm run smoke:gateway-boundaries
-npm run smoke:final
-```
-
-说明：
-
-- `npm test` 覆盖质量诊断、修正记忆、SRT 和导出报告生成函数。
-- `npm run build` 验证生产构建。
-- `npm run check:api` 检查翻译和 ASR Provider 的配置边界。
-- `npm run smoke:file-asr` 使用内置英文样本测试文件 ASR；未配置 Key 时会明确暴露边界，不伪装成功。
-- `npm run smoke:media` 覆盖英文语音、英文视频、音乐/无语音和 Live 分片样本。
-- `npm run smoke:gateway-boundaries` 覆盖 Gateway 成功路径和错误边界。
-- `npm run smoke:final` 聚合构建、单测、API、File、媒体、Gateway 和密钥扫描，并生成最终自动验收记录。
 
 ## 项目结构
 
@@ -145,27 +113,62 @@ npm run smoke:final
 └── interpreter/
     ├── src/                   # React 同传工作台
     ├── server/                # Node AI Gateway 与 ASR/翻译代理
-    ├── docs/                  # 演示脚本、视觉系统、测试说明
-    ├── scripts/               # API 检查与文件 ASR 烟测脚本
-    ├── test-media/            # 英文语音测试样本
+    ├── docs/                  # 演示脚本、视觉系统、测试与验收记录
+    ├── scripts/               # API 检查、媒体 smoke、浏览器 smoke、密钥扫描
+    ├── test-media/            # 自动化测试用音频、视频和 Live 分片样本
     └── README.md              # 更详细的工程说明
 ```
 
+前端使用 Vite + React + Zustand。后端是轻量 Node Gateway，不做用户系统、数据库或字幕持久化，只负责 Key 隔离、ASR/翻译请求适配、音频转码、有限重试和统一错误边界。
+
+## 验证命令
+
+在 `interpreter/` 下执行：
+
+```bash
+npm run build
+npm test
+npm run check:api
+npm run smoke:file-asr
+npm run smoke:media
+npm run smoke:gateway-boundaries
+npm run smoke:browser-ux
+npm run smoke:final
+npm run scan:secrets
+```
+
+命令说明：
+
+- `npm run build`：验证 Vite 生产构建。
+- `npm test`：覆盖语义分段、ASR 错误、快语速/静音、自动回修、TTS、导出和质量诊断。
+- `npm run check:api`：检查 `.env` 中翻译和 ASR Provider 的可达性。
+- `npm run smoke:file-asr`：使用内置英文样本测试文件 ASR。
+- `npm run smoke:media`：覆盖英文音频、音乐无语音、视频音轨、WAV Live 分片和 WebM/Opus Live 分片。
+- `npm run smoke:gateway-boundaries`：验证坏 JSON、缺文件、超大小、缺 Key 等边界。
+- `npm run smoke:browser-ux`：浏览器自动验证 Demo、文件、视频、Live 注入流、浮窗、快语速、静音、TTS、人工修正和 SRT 导出。
+- `npm run smoke:final`：聚合构建、单测、API、File、媒体、Gateway、浏览器体验和密钥扫描，并生成最终验收记录。
+- `npm run scan:secrets`：检查仓库中是否误提交真实 Key。
+
+最近一次自动验收结果见 [最终闭环自动验收记录](interpreter/docs/final-closure-smoke.md)，记录包含构建、单测、API 配置、File ASR、多媒体场景、Gateway 边界、浏览器体验和密钥扫描。
+
 ## 题目二对应关系
 
-比赛要求：开发能将外语音频流实时翻译成中文，并以字幕或语音形式输出，且具备翻译修正能力的助手。本项目默认目标语言为中文，同时保留英文、日文、韩文等目标语言切换，便于展示可扩展的同传路由。
+比赛要求：开发能将外语音频流实时翻译成中文，并以字幕或语音形式输出，且具备翻译修正能力的助手。
 
 本项目对应实现：
 
 - 外语音频流输入：Demo、Mic、File、Live 四类输入源。
-- 实时目标语言输出：字幕流、底部大字幕、浏览器 TTS，默认中文。
-- 翻译修正能力：人工修正、术语重译、修正记忆、质量诊断。
-- 可提交材料：公开仓库、README、Demo 视频链接位、演示脚本和可运行代码。
+- 实时目标语言输出：字幕流、底部大字幕、字幕浮窗、浏览器 TTS，默认中文。
+- 翻译修正能力：人工修正、术语重译、修正记忆、自动上下文回修和质量诊断。
+- 可提交材料：公开仓库、README、Demo 视频链接位、演示脚本、验收记录和可运行代码。
 
 ## 能力边界
 
 - Demo 模式用于稳定证明完整产品闭环，不伪装成真实 ASR。
 - File / Live 真实 ASR 依赖 Provider、Key、网络和供应商接口能力。
-- Live 模式默认 1 秒低延迟分片，处理耗时按毫秒统计；端到端延迟仍取决于 ASR、翻译和网络，不承诺零延迟。
-- 字幕浮窗通过浏览器 Picture-in-Picture 或弹出窗口展示，不直接修改第三方直播网页 DOM。
-- 当前单文件上传建议控制在 25MB 内；DashScope inline 音频建议 10MB 内。
+- Live 模式默认采用低延迟语义窗；端到端延迟仍取决于音频采样、ASR、翻译和网络，不承诺零延迟。
+- 如果没有共享标签页音频，系统会提示无实际音量，不生成假字幕。
+- 字幕浮窗依赖浏览器 Picture-in-Picture 或弹出窗口，不直接修改第三方直播/会议页面 DOM。
+- 当前前端建议单次上传 25MB 内；DashScope inline 音频建议 10MB 内。更大文件需要继续扩展对象存储 URL 或后端分片上传。
+- TTS 使用浏览器原生 `speechSynthesis`，实际音色、语言和音量取决于系统与浏览器。
+- Gateway 不存储历史字幕和用户数据；刷新页面后仅保留 localStorage 中的非 Key 设置。
