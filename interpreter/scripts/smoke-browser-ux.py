@@ -65,6 +65,12 @@ def main():
         page = browser.new_page(viewport={"width": 1440, "height": 950})
         page.goto(APP_URL, wait_until="networkidle")
         reset_browser_state(page)
+        results.append(run_case("diagnostic-interim-compact", lambda: run_diagnostic_interim_compact(page)))
+        page.close()
+
+        page = browser.new_page(viewport={"width": 1440, "height": 950})
+        page.goto(APP_URL, wait_until="networkidle")
+        reset_browser_state(page)
         results.append(run_case("live-stop-final-flush", lambda: run_live_stop_final_flush(page)))
         page.close()
 
@@ -302,6 +308,43 @@ def run_fast_live_sample(page):
     return pass_result(
         "fast-live-sample-stream",
         f"live={compact(live[:260])} sample={compact(text[:220])}",
+    )
+
+
+def run_diagnostic_interim_compact(page):
+    ok = page.evaluate("""() => {
+      if (!window.__SIMULCAST_TEST__?.setFastDiagnosticInterim) return false;
+      return window.__SIMULCAST_TEST__.setFastDiagnosticInterim();
+    }""")
+    if not ok:
+      return fail_result("diagnostic-interim-compact", "test diagnostic hook unavailable")
+
+    page.wait_for_selector('[data-diagnostic-interim="true"]', timeout=5000)
+    metrics = page.evaluate("""() => {
+      const card = document.querySelector('[data-diagnostic-interim="true"]');
+      const translated = card?.querySelector('.translated-text');
+      const banner = document.querySelector('.subtitle-banner');
+      const bannerText = banner?.textContent || '';
+      const style = translated ? window.getComputedStyle(translated) : null;
+      return {
+        cardText: card?.textContent || '',
+        bannerText,
+        fontSize: style ? Number.parseFloat(style.fontSize) : 0,
+        cardHeight: card?.getBoundingClientRect().height || 0,
+      };
+    }""")
+    if "语速过快" not in metrics["cardText"]:
+        raise AssertionError(f"Diagnostic interim card missing speed warning: {metrics}")
+    if metrics["fontSize"] > 18:
+        raise AssertionError(f"Diagnostic interim is rendered like a primary subtitle: {metrics}")
+    if metrics["cardHeight"] > 150:
+        raise AssertionError(f"Diagnostic interim card is too tall for live tracking: {metrics}")
+    if "语速过快" in metrics["bannerText"]:
+        raise AssertionError(f"Bottom subtitle banner displayed diagnostic text as target caption: {metrics}")
+    page.screenshot(path=str(OUT_DIR / "ux-diagnostic-interim-compact.png"), full_page=True)
+    return pass_result(
+        "diagnostic-interim-compact",
+        f"font={metrics['fontSize']} height={metrics['cardHeight']} banner={compact(metrics['bannerText'][:100])}",
     )
 
 

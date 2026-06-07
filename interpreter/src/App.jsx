@@ -334,8 +334,8 @@ export default function App() {
   const hasServerTranslationKey = Boolean(serverHealth.ok && (serverHealth.hasTranslationKey ?? serverHealth.hasOpenAIKey));
   const hasLiveAsr = Boolean(asrApiKey.trim() || hasServerAsrKey);
   const effectiveChunkSeconds = Math.max(2, Number(chunkSeconds) || 3);
+  const interimIsDiagnostic = isDiagnosticInterim(currentInterim);
   const hasSignal = isRunning || isCapturing || currentInterim.en || hasSubtitles || fileProgress > 0;
-  const showSubtitlePreview = showBanner && (isRunning || currentInterim.en || hasSubtitles);
   const nextAction = getNextAction({
     sourceMode,
     fileMeta,
@@ -379,6 +379,14 @@ export default function App() {
       }
   ), [displaySubtitles, selectedSubtitleId]);
   const hasSelectedSubtitle = selectedSubtitle.id !== 'empty';
+  const subtitlePreviewText = subtitleMode === 'en-only'
+    ? (currentInterim.en || (hasSelectedSubtitle ? selectedSubtitle.en : ''))
+    : (!interimIsDiagnostic && currentInterim.zh
+      ? currentInterim.zh
+      : (hasSelectedSubtitle ? selectedSubtitle.zh : ''));
+  const showSubtitlePreview = showBanner
+    && Boolean(subtitlePreviewText)
+    && (hasSubtitles || !interimIsDiagnostic || subtitleMode === 'en-only');
   const latestSubtitle = useMemo(() => (
     displaySubtitles.find((subtitle) => subtitle.isCurrent)
       ?? displaySubtitles.at(-1)
@@ -843,6 +851,29 @@ export default function App() {
         if (!overlayWindow || overlayWindow.closed) return '';
         return overlayWindow.document.getElementById('caption-overlay-root')?.innerText ?? '';
       },
+      setFastDiagnosticInterim: () => {
+        const diagnostic = '语速过快（260 WPM），正在合并下一语义窗追赶当前讲话。';
+        setSourceMode('live');
+        setLiveStage('running');
+        setLiveStats({
+          ...createLiveStats(),
+          speechRateWpm: 260,
+          speechRateLevel: 'overload',
+          asrUnstable: 3,
+        });
+        setLiveStatus('直播片段 #2-4 音频存在，但语速过快（260 WPM）导致 ASR 未稳定捕获。系统会继续合并下一语义窗并保留上下文，不会按“无音频”处理。');
+        useStore.setState({
+          isRunning: true,
+          currentInterim: {
+            en: 'I saw many people taking walks or chatting happily.',
+            zh: diagnostic,
+          },
+          subtitles: [],
+          selectedSubtitleId: null,
+          sessionStartTime: Date.now(),
+        });
+        return true;
+      },
       getTTSStats,
       resetTTSStats,
       startSilentLiveSample: async () => {
@@ -1280,10 +1311,13 @@ export default function App() {
               </article>
             )}
             {currentInterim.en && (
-              <article className="subtitle-card interim">
+              <article
+                className={`subtitle-card interim ${interimIsDiagnostic ? 'diagnostic' : ''}`}
+                data-diagnostic-interim={interimIsDiagnostic ? 'true' : undefined}
+              >
                 <div className="subtitle-meta">
                   <time>live</time>
-                  <span>{copy.recognizing}</span>
+                  <span>{interimIsDiagnostic ? getInterimDiagnosticLabel(currentInterim) : copy.recognizing}</span>
                 </div>
                 {shouldShowOriginal(subtitleMode, showOriginal) && (
                   <p className="source-text">{currentInterim.en}</p>
@@ -1335,9 +1369,9 @@ export default function App() {
           )}
 
           {showSubtitlePreview && (
-            <div className="subtitle-banner">
+            <div className={`subtitle-banner ${interimIsDiagnostic ? 'diagnostic' : ''}`}>
               <span>{subtitleMode === 'en-only' ? copy.sourceOnly : copy.targetOnly}</span>
-              <strong>{subtitleMode === 'en-only' ? (currentInterim.en || selectedSubtitle.en) : (currentInterim.zh || selectedSubtitle.zh)}</strong>
+              <strong>{subtitlePreviewText}</strong>
             </div>
           )}
 
@@ -1713,6 +1747,20 @@ function LiveStateItem({ label, value, state = 'idle' }) {
   );
 }
 
+function isDiagnosticInterim(interim) {
+  const text = `${interim?.en ?? ''}\n${interim?.zh ?? ''}`;
+  return /语速过快|语速偏快|ASR 暂未稳定|ASR 未稳定|合并下一语义窗|等待真实语音输入|没有实际音量|未检测到实际音量|共享标签页音频|最后一段语音信息不足/i.test(text);
+}
+
+function getInterimDiagnosticLabel(interim) {
+  const text = `${interim?.en ?? ''}\n${interim?.zh ?? ''}`;
+  if (/语速过快/i.test(text)) return '语速过快';
+  if (/语速偏快/i.test(text)) return '语速偏快';
+  if (/没有实际音量|未检测到实际音量|共享标签页音频/i.test(text)) return '音频输入提示';
+  if (/ASR 暂未稳定|ASR 未稳定|合并下一语义窗/i.test(text)) return 'ASR 追赶中';
+  return '状态提示';
+}
+
 function getWaveformLevel(waveformData, index) {
   if (!waveformData.length) return 24 + ((index * 19) % 52);
   const value = waveformData[index % waveformData.length] ?? 0;
@@ -2035,11 +2083,14 @@ function buildCaptionOverlayPayload({
   liveStats,
   isCapturing,
 }) {
+  const interimIsDiagnostic = isDiagnosticInterim(currentInterim);
   const source = currentInterim.en || latestSubtitle?.en || '';
-  const target = currentInterim.zh || latestSubtitle?.zh || '';
+  const target = !interimIsDiagnostic && currentInterim.zh
+    ? currentInterim.zh
+    : latestSubtitle?.zh || '';
   const modeLabel = `${formatLanguageCode(sourceLanguage)} -> ${formatLanguageCode(targetLanguage)} · ${copy.subtitles}`;
   const liveStatus = sourceMode === 'live'
-    ? `${captureSourceLabel || copy.live} · ${isCapturing ? liveStage : 'idle'} · Done ${liveStats.processed}`
+    ? `${captureSourceLabel || copy.live} · ${isCapturing ? liveStage : 'idle'} · Done ${liveStats.processed}${interimIsDiagnostic ? ' · ' + getInterimDiagnosticLabel(currentInterim) : ''}`
     : `${sourceMode.toUpperCase()} · ${target ? 'captions ready' : 'waiting'}`;
 
   return {

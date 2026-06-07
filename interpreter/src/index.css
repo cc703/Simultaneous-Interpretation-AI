@@ -1059,6 +1059,23 @@ button {
   animation: live-scan 1.4s linear infinite;
 }
 
+.subtitle-card.interim.diagnostic {
+  border-left-color: var(--amber);
+  background: rgba(245, 158, 11, 0.08);
+}
+
+.subtitle-card.interim.diagnostic .source-text {
+  margin-top: 10px;
+  font-size: 15px;
+}
+
+.subtitle-card.interim.diagnostic .translated-text {
+  color: #fcd34d;
+  font-size: 16px;
+  font-weight: 720;
+  line-height: 1.45;
+}
+
 .subtitle-card.empty-state {
   border-left-color: var(--green);
   border-style: dashed;
@@ -1315,6 +1332,12 @@ textarea.editor-preview {
   color: #ffffff;
   font-size: 28px;
   line-height: 1.35;
+}
+
+.subtitle-banner.diagnostic strong {
+  color: #fcd34d;
+  font-size: 17px;
+  font-weight: 720;
 }
 
 .stats-bar {
